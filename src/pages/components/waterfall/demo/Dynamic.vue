@@ -39,6 +39,9 @@
         @reload="onReload"
       />
     </sar-pull-down-refresh>
+
+    <!-- 瀑布流演示导航 -->
+    <WaterfallDemoNavigation />
   </doc-page>
 </template>
 
@@ -52,6 +55,7 @@ import {
   type LoadMoreStatus,
 } from 'sard-uniapp'
 import { onMounted, ref } from 'vue'
+import WaterfallDemoNavigation from './WaterfallDemoNavigation.vue'
 
 // api
 interface ListItem {

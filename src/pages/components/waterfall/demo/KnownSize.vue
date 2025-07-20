@@ -14,6 +14,9 @@
         </template>
       </sar-waterfall-item>
     </sar-waterfall>
+
+    <!-- 瀑布流演示导航 -->
+    <WaterfallDemoNavigation />
   </doc-page>
 </template>
 
@@ -21,6 +24,7 @@
 import { random } from 'sard-uniapp'
 import { onMounted, ref } from 'vue'
 import SimulatedImage from './SimulatedImage.vue'
+import WaterfallDemoNavigation from './WaterfallDemoNavigation.vue'
 import { text } from '../../read-more/demo/data'
 
 interface ListItem {

@@ -8,6 +8,9 @@
         </template>
       </sar-waterfall-item>
     </sar-waterfall>
+
+    <!-- 瀑布流演示导航 -->
+    <WaterfallDemoNavigation />
   </doc-page>
 </template>
 
@@ -15,6 +18,7 @@
 import { random, toast } from 'sard-uniapp'
 import { nextTick, onMounted, ref } from 'vue'
 import SimulatedImage from './SimulatedImage.vue'
+import WaterfallDemoNavigation from './WaterfallDemoNavigation.vue'
 import { text } from '../../read-more/demo/data'
 
 interface ListItem {
@@ -59,3 +63,5 @@ onMounted(async () => {
   list.value.push(...(await getData()))
 })
 </script>
+
+<style lang="scss" scoped></style>

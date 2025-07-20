@@ -13,12 +13,16 @@
         </template>
       </sar-waterfall-item>
     </sar-waterfall>
+
+    <!-- 瀑布流演示导航 -->
+    <WaterfallDemoNavigation />
   </doc-page>
 </template>
 
 <script lang="ts" setup>
 import { shuffle, toast } from 'sard-uniapp'
 import { nextTick, onMounted, ref } from 'vue'
+import WaterfallDemoNavigation from './WaterfallDemoNavigation.vue'
 
 interface ListItem {
   url: string
