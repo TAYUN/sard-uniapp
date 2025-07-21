@@ -1,10 +1,21 @@
 <template>
+  <!-- 瀑布流容器：动态高度，包含所有瀑布流项目 -->
   <view :class="waterfallClass" :style="waterfallStyle">
     <slot></slot>
   </view>
 </template>
 
 <script setup lang="ts">
+/**
+ * 瀑布流组件 - 主容器组件
+ *
+ * 功能说明：
+ * 1. 管理多列瀑布流布局
+ * 2. 计算每个项目的位置（top, left）
+ * 3. 监听项目加载状态，动态调整布局
+ * 4. 提供上下文给子组件使用
+ */
+
 import {
   computed,
   getCurrentInstance,
@@ -32,7 +43,9 @@ import {
   waterfallContextKey,
 } from './common'
 import { type WaterfallItemInfo } from '../waterfall-item/common'
+import { onHide, onShow } from '@dcloudio/uni-app'
 
+// 组件配置：启用虚拟主机和样式隔离
 defineOptions({
   options: {
     virtualHost: true,
@@ -40,23 +53,36 @@ defineOptions({
   },
 })
 
+// 组件属性定义
 const props = withDefaults(defineProps<WaterfallProps>(), defaultWaterfallProps)
 
+// 插槽定义
 defineSlots<WaterfallSlots>()
 
+// 事件定义
 const emit = defineEmits<WaterfallEmits>()
 
+// BEM 样式类名生成器
 const bem = createBem('waterfall')
 
-// main
+const isActive = ref(true)
 
-// size
+// ==================== 容器尺寸管理 ====================
+
+// 生成唯一的容器ID，用于DOM查询
 const containerId = uniqid()
+// 获取当前组件实例，用于DOM操作
 const instance = getCurrentInstance()
 
+// 容器宽度（响应式）
 const containerWidth = ref(0)
+// 容器高度（响应式，根据最高列计算）
 const containerHeight = ref(0)
 
+/**
+ * 计算每列的宽度
+ * 公式：(总宽度 - (列数-1) * 列间距) / 列数
+ */
 const columnWidth = computed(() => {
   return (
     (containerWidth.value - (props.columns - 1) * props.columnGap) /
@@ -64,22 +90,41 @@ const columnWidth = computed(() => {
   )
 })
 
+/**
+ * 组件挂载后获取容器实际宽度
+ */
 onMounted(async () => {
   containerWidth.value = (
     await getBoundingClientRect(`.${containerId}`, instance)
   ).width
 })
 
-// status
+// ==================== 加载状态管理 ====================
+
+/**
+ * 加载状态：
+ * - 'idle': 空闲状态，所有项目都已加载完成
+ * - 'busy': 忙碌状态，有项目正在加载中
+ */
 let loadStatus: 'idle' | 'busy' = 'idle'
 
+/**
+ * 加载完成后的回调函数队列
+ * 当所有项目加载完成时，会依次执行这些回调
+ */
 let loadedHandlers: (() => void)[] = []
 
+/**
+ * 注册加载完成回调
+ * @param handler 回调函数
+ */
 const onLoad = (handler: () => void) => {
   nextTick(() => {
     if (loadStatus === 'idle') {
+      // 如果当前是空闲状态，立即执行回调
       handler()
     } else {
+      // 如果正在加载中，将回调加入队列
       if (!loadedHandlers.includes(handler)) {
         loadedHandlers.push(handler)
       }
@@ -87,106 +132,305 @@ const onLoad = (handler: () => void) => {
   })
 }
 
+/**
+ * 更新加载状态
+ * 检查所有项目的加载状态，更新整体加载状态并触发相应事件
+ */
 const updateLoadStatus = () => {
+  // 检查是否有未加载完成的项目
   const includeLoading = items.some((item) => !item.loaded)
+
   if (includeLoading) {
+    // 有项目未加载完成
     if (loadStatus === 'idle') {
       loadStatus = 'busy'
-      emit('loadstart')
+      emit('loadstart') // 触发加载开始事件
     }
   } else {
+    // 所有项目都已加载完成
     if (loadStatus === 'busy') {
+      // 执行所有等待的回调函数
       loadedHandlers.forEach((handler) => handler())
       loadedHandlers = []
 
       loadStatus = 'idle'
-      emit('load')
+      emit('load') // 触发加载完成事件
     }
   }
 }
 
-// items
+// ==================== 瀑布流项目管理 ====================
+
+/**
+ * 瀑布流项目列表
+ * 存储所有子组件的信息，包括位置、尺寸、加载状态等
+ */
 const items: WaterfallItemInfo[] = []
 
+/**
+ * 待排版项目队列
+ * 存储需要排版的项目，按顺序排版
+ */
+const pendingItems: WaterfallItemInfo[] = []
+
+/**
+ * 添加瀑布流项目
+ * 当子组件挂载时调用，将项目信息添加到列表中
+ * @param item 项目信息对象
+ */
 const addItem = (item: WaterfallItemInfo) => {
   if (!items.includes(item)) {
     items.push(item)
-    reflow()
-    updateLoadStatus()
+    // 直接加入待排版队列
+    if (!pendingItems.includes(item)) {
+      pendingItems.push(item)
+    }
+    // 触发排版
+    processQueue()
+    updateLoadStatus() // 更新加载状态
   }
 }
 
+/**
+ * 移除瀑布流项目
+ * 当子组件卸载时调用，从列表中移除项目信息
+ * @param item 项目信息对象
+ */
 const removeItem = (item: WaterfallItemInfo) => {
   if (items.includes(item)) {
     items.splice(items.indexOf(item), 1)
-    reflow()
-    updateLoadStatus()
+    // 从待排版队列中也移除
+    const pendingIndex = pendingItems.indexOf(item)
+    if (pendingIndex > -1) {
+      pendingItems.splice(pendingIndex, 1)
+    }
+    // 移除项目后需要完整重排版，因为后续项目的位置可能需要调整
+    reflow(true)
+    updateLoadStatus() // 更新加载状态
   }
 }
 
-const reflow = throttle(async () => {
+// ==================== 瀑布流布局算法 ====================
+
+/**
+ * 获取当前列的高度状态
+ * 根据已排版的项目计算每列的当前高度
+ */
+const getColumnsHeight = () => {
   const columns = Array(props.columns)
     .fill(0)
-    .map((_, index) => {
-      return { colIndex: index, height: 0 }
+    .map((_, index) => ({ colIndex: index, height: 0 }))
+
+  // 遍历已可见的项目，计算每列的实际高度
+  items
+    .filter((item) => item.visible)
+    .forEach((item) => {
+      // 根据 left 位置计算列索引
+      // 反推公式：colIndex = left / (columnGap + columnWidth)
+      const colIndex = Math.round(
+        item.left / (props.columnGap + columnWidth.value),
+      )
+
+      if (columns[colIndex] !== undefined) {
+        const itemBottom = item.top + item.height
+        columns[colIndex].height = Math.max(
+          columns[colIndex].height,
+          itemBottom,
+        )
+      }
     })
 
-  for (const item of items) {
-    if (!item.loaded) {
+  return columns
+}
+
+/**
+ * 处理排版队列
+ * 从 pendingItems 队列中取出项目进行排版
+ */
+const processQueue = throttle(async () => {
+  // 如果页面不活跃，暂停排版
+  if (!isActive.value) {
+    return
+  }
+
+  // 获取当前列的高度状态（基于已排版的项目）
+  const columns = getColumnsHeight()
+
+  // 处理队列中的项目
+  while (pendingItems.length > 0) {
+    // 如果页面在排版过程中变为不活跃，停止排版
+    if (!isActive.value) {
       break
     }
+
+    const item = pendingItems[0] // 取队列第一个项目
+
+    // 检查项目是否已加载
+    if (!item.loaded) {
+      break // 遇到未加载的项目就停止，保持顺序
+    }
+
+    try {
+      // 执行项目的预处理（如获取尺寸）
+      await item.beforeReflow()
+    } catch {
+      // 如果获取尺寸失败（页面可能不活跃），停止排版
+      break
+    }
+
+    // 找到当前最短的列
     columns.sort((a, b) => a.height - b.height)
     const minColumn = columns[0]
 
     if (!minColumn) break
 
-    await item.beforeReflow()
+    // 计算项目位置
     item.top = minColumn.height === 0 ? 0 : minColumn.height + props.rowGap
     item.left = (props.columnGap + columnWidth.value) * minColumn.colIndex
-    item.visible = true
+    item.visible = true // 设置为可见
+
+    // 更新该列的高度
     minColumn.height = item.top + item.height
+
+    // 从队列中移除已排版的项目
+    pendingItems.shift()
   }
 
-  containerHeight.value = columns.sort((a, b) => b.height - a.height)[0].height
+  // 计算容器总高度（取最高列的高度）
+  containerHeight.value = Math.max(...columns.map((col) => col.height), 0)
+}, 50) // 50ms 节流，避免频繁计算
+
+/**
+ * 完整重新排版函数（仅在必要时使用）
+ * 重新排版所有项目，用于列数变化等需要完全重新布局的场景
+ */
+const fullReflow = throttle(async () => {
+  // 如果页面不活跃，暂停排版
+  if (!isActive.value) {
+    return
+  }
+
+  // 重置所有项目的可见状态
+  items.forEach((item) => {
+    item.visible = false
+  })
+
+  // 重新构建待排版队列
+  pendingItems.length = 0
+  pendingItems.push(...items)
+
+  // 处理队列
+  await processQueue()
 }, 50)
 
-const onItemLoad = () => {
-  reflow()
-  updateLoadStatus()
+/**
+ * 主排版函数
+ * 根据情况选择增量排版或完整重排版
+ */
+const reflow = (force = false) => {
+  if (force) {
+    return fullReflow()
+  } else {
+    return processQueue()
+  }
 }
 
+/**
+ * 项目加载完成回调
+ * 当子组件的内容（如图片）加载完成时调用
+ */
+const onItemLoad = () => {
+  // 触发队列处理
+  processQueue()
+  updateLoadStatus() // 更新加载状态
+}
+
+// ==================== 响应式监听 ====================
+
+/**
+ * 监听布局相关属性变化
+ * 当列数、列间距、行间距发生变化时，需要完整重新排版
+ */
 watch([() => props.columns, () => props.columnGap, () => props.rowGap], () => {
   setTimeout(() => {
-    reflow()
-  }, 50)
+    reflow(true) // 强制完整重排版
+  }, 50) // 延迟执行，确保DOM更新完成
 })
 
+/**
+ * 监听页面活跃状态变化
+ * 当页面从不活跃变为活跃时，继续处理待排版的项目
+ */
+watch(
+  () => isActive.value,
+  (newActive, oldActive) => {
+    if (newActive && !oldActive) {
+      // 页面从不活跃变为活跃，继续处理待排版队列
+      setTimeout(() => {
+        if (pendingItems.length > 0) {
+          processQueue()
+        }
+      }, 100) // 延迟执行，确保页面完全激活
+    }
+    // 页面变为不活跃时不需要特殊处理，processQueue 会自动停止
+  },
+)
+
+onShow(() => {
+  isActive.value = true
+})
+
+onHide(() => {
+  isActive.value = false
+})
+
+// ==================== 上下文提供 ====================
+
+/**
+ * 向子组件提供瀑布流上下文
+ * 子组件可以通过 inject 获取这些方法和数据
+ */
 provide(
   waterfallContextKey,
   reactive({
-    addItem,
-    removeItem,
-    onItemLoad,
-    columnWidth: columnWidth,
+    addItem, // 添加项目方法
+    removeItem, // 移除项目方法
+    onItemLoad, // 项目加载完成回调
+    columnWidth, // 列宽度（响应式）
   }),
 )
 
-// others
+// ==================== 组件暴露接口 ====================
+
+/**
+ * 暴露给父组件的方法
+ * 父组件可以通过 ref 调用这些方法
+ */
 defineExpose<WaterfallExpose>({
-  reflow,
-  onLoad,
+  reflow, // 手动触发重排
+  onLoad, // 注册加载完成回调
 })
 
+// ==================== 样式计算 ====================
+
+/**
+ * 计算容器的CSS类名
+ * 包含BEM基础类名、唯一ID和用户自定义类名
+ */
 const waterfallClass = computed(() => {
   return classNames(bem.b(), containerId, props.rootClass)
 })
 
+/**
+ * 计算容器的内联样式
+ * 主要是动态设置容器高度
+ */
 const waterfallStyle = computed(() => {
   return stringifyStyle(
     {
-      height: containerHeight.value + 'px',
+      height: containerHeight.value + 'px', // 动态高度
     },
-    props.rootStyle,
+    props.rootStyle, // 用户自定义样式
   )
 })
 </script>

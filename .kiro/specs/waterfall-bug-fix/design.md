@@ -88,8 +88,8 @@
 ```mermaid
 graph TB
     subgraph "页面生命周期管理"
-        A[onActivated] --> B[状态重置]
-        C[onDeactivated] --> D[中断异步操作]
+        A[onShow] --> B[状态重置]
+        C[onHide] --> D[中断异步操作]
         B --> E[重新初始化]
         D --> F[清理资源]
     end
@@ -126,8 +126,8 @@ graph TB
 
 **生命周期增强**：
 
-- `onActivated`: 页面激活时重置状态并重新初始化
-- `onDeactivated`: 页面失活时中断异步操作
+- `onShow`: 页面激活时重置状态并重新初始化
+- `onHide`: 页面失活时中断异步操作
 - `onBeforeUnmount`: 组件卸载时清理资源
 
 #### 2. waterfall-item.vue 修改设计
@@ -152,15 +152,15 @@ graph TB
 ```typescript
 interface PageActivationManager {
   isActive: Ref<boolean>
-  onActivated: () => void
-  onDeactivated: () => void
+  onShow: () => void
+  onHide: () => void
   resetState: () => void
 }
 ```
 
 **实现要点**：
 
-- 使用Vue的`onActivated`和`onDeactivated`钩子
+- 使用uniapp的`onShow`和`onHide`钩子
 - 在上下文中提供激活状态给子组件
 - 页面激活时重置所有相关状态
 
@@ -425,7 +425,7 @@ const abortController = ref<AbortController | null>(null)
 const debug = createDebugger('Waterfall')
 
 // 页面激活处理
-onActivated(() => {
+onShow(() => {
   debug.log('页面激活')
   isActive.value = true
   resetState()
@@ -436,7 +436,7 @@ onActivated(() => {
 })
 
 // 页面失活处理
-onDeactivated(() => {
+onHide(() => {
   debug.log('页面失活')
   isActive.value = false
   abortCurrentOperations()
@@ -558,7 +558,7 @@ const createDebugger = (componentName: string) => {
 
 ### 1. Vue版本兼容性
 
-- 确保`onActivated`和`onDeactivated`在Vue 3.4+中正常工作
+- 确保`onShow`和`onHide`在uniapp环境中正常工作
 - `AbortController`的浏览器兼容性检查
 
 ### 2. uniapp平台兼容性

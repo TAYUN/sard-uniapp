@@ -24,12 +24,12 @@ interface DemoItem {
 // 瀑布流演示列表
 const demoList: DemoItem[] = [
   { title: '基础', path: '/pages/components/waterfall/demo/Basic' },
-  { title: '大图', path: '/pages/components/waterfall/demo/BigImage' },
+  { title: '真实', path: '/pages/components/waterfall/demo/TrueCase' },
   { title: '列数', path: '/pages/components/waterfall/demo/Columns' },
   { title: '刷新', path: '/pages/components/waterfall/demo/Dynamic' },
   { title: '已知', path: '/pages/components/waterfall/demo/KnownSize' },
   { title: '等待', path: '/pages/components/waterfall/demo/MaxWait' },
-  { title: '真实', path: '/pages/components/waterfall/demo/TrueCase' },
+  { title: '大图', path: '/pages/components/waterfall/demo/BigImage' },
 ]
 
 const navigateToDemo = (path: string) => {
