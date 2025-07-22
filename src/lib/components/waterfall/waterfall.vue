@@ -208,7 +208,7 @@ const resetColumnsHeight = () => {
  * 不使用计算属性，确保每次都能获取到最新的列状态
  */
 const getMinColumn = () => {
-  if (columns.length === 0) return null
+  // if (columns.length === 0) return null
 
   let min = columns[0]
   for (let i = 1; i < columns.length; i++) {
@@ -218,6 +218,7 @@ const getMinColumn = () => {
   }
   return min
 }
+const minColumn = computed(() => getMinColumn())
 
 /**
  * 添加瀑布流项目
@@ -225,15 +226,9 @@ const getMinColumn = () => {
  * @param item 项目信息对象
  */
 const addItem = (item: WaterfallItemInfo) => {
-  if (!items.includes(item)) {
-    items.push(item)
-    // 直接加入待排版队列
-    if (!pendingItems.includes(item)) {
-      pendingItems.push(item)
-    }
-    // 触发排版
-    processQueue()
-    updateLoadStatus() // 更新加载状态
+  // 直接加入待排版队列
+  if (!pendingItems.includes(item)) {
+    pendingItems.push(item)
   }
 }
 
@@ -245,13 +240,7 @@ const addItem = (item: WaterfallItemInfo) => {
 const removeItem = (item: WaterfallItemInfo) => {
   if (items.includes(item)) {
     items.splice(items.indexOf(item), 1)
-    // 从待排版队列中也移除
-    const pendingIndex = pendingItems.indexOf(item)
-    if (pendingIndex > -1) {
-      pendingItems.splice(pendingIndex, 1)
-    }
-    // 移除项目后需要完整重排版，因为后续项目的位置可能需要调整
-    reflow(true)
+    // todo 调度器重排后面的
     updateLoadStatus() // 更新加载状态
   }
 }
@@ -278,8 +267,29 @@ const processQueue = throttle(async () => {
     const item = pendingItems[0] // 取队列第一个项目
 
     // 检查项目是否已加载
+    // 没加载完，就等待加载完成 因为不管子项目加载成功还是加载失败，都会调设置loaded为true
+    // 检查项目是否已加载
     if (!item.loaded) {
-      break // 遇到未加载的项目就停止，保持顺序
+      // 创建一个 Promise 等待加载完成
+      await new Promise<void>((resolve) => {
+        // 创建一个监听器
+        const unwatch = watch(
+          () => item.loaded,
+          (newLoaded) => {
+            if (newLoaded) {
+              unwatch() // 停止监听
+              resolve() // 解决 Promise
+            }
+          },
+        )
+
+        // 设置超时，避免永久等待
+        setTimeout(() => {
+          unwatch()
+          console.warn('项目加载超时，强制继续')
+          resolve()
+        }, 5000)
+      })
     }
 
     try {
@@ -297,30 +307,16 @@ const processQueue = throttle(async () => {
       // 如果获取尺寸失败，停止排版
       break
     }
-    // debugger
-    // 获取当前最短的列（实时计算）
-    const shortestColumn = getMinColumn()
-
-    if (!shortestColumn) break // 没有列，停止排版
 
     // 计算项目位置
-    item.top =
-      shortestColumn.height === 0 ? 0 : shortestColumn.height + props.rowGap
-    item.left = (props.columnGap + columnWidth.value) * shortestColumn.colIndex
+    item.top = minColumn.value.height + props.rowGap
+    item.left = (props.columnGap + columnWidth.value) * minColumn.value.colIndex
     item.visible = true // 设置为可见
 
     // 更新该列的高度
-    shortestColumn.height = item.top + item.height
-
-    // 调试信息（生产环境可移除）
-    const oldHeight = shortestColumn.height - item.height
-    console.log(
-      `项目排版 - 列${shortestColumn.colIndex}: ${oldHeight} → ${shortestColumn.height}, 项目top: ${item.top}, 项目高度: ${item.height}`,
-    )
-
+    columns[minColumn.value.colIndex].height = item.top + item.height
     // 从队列中移除已排版的项目
     pendingItems.shift()
-
     // 确保每个项目排版后都有一个微任务的间隔，避免竞态条件
     await new Promise((resolve) => setTimeout(resolve, 0))
   }
@@ -351,15 +347,14 @@ const fullReflow = throttle(async () => {
   pendingItems.length = 0
   pendingItems.push(...items)
 
-  // 处理队列
-  await processQueue()
+  // todo 交给调度器排列
 }, 50)
 
 /**
  * 主排版函数
  * 根据情况选择增量排版或完整重排版
  */
-const reflow = (force = false) => {
+const reflow = (force = true) => {
   if (force) {
     return fullReflow()
   } else {
@@ -372,8 +367,6 @@ const reflow = (force = false) => {
  * 当子组件的内容（如图片）加载完成时调用
  */
 const onItemLoad = () => {
-  // 触发队列处理
-  processQueue()
   updateLoadStatus() // 更新加载状态
 }
 
@@ -403,12 +396,14 @@ watch(
     if (newActive && !oldActive) {
       // 页面从不活跃变为活跃，继续处理待排版队列
       setTimeout(() => {
-        if (pendingItems.length > 0) {
-          processQueue()
-        }
+        // 交给调度器 排列
+        reflow(false)
       }, 100) // 延迟执行，确保页面完全激活
     }
     // 页面变为不活跃时不需要特殊处理，processQueue 会自动停止
+  },
+  {
+    immediate: true,
   },
 )
 
