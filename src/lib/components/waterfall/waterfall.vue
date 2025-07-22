@@ -97,6 +97,8 @@ onMounted(async () => {
   containerWidth.value = (
     await getBoundingClientRect(`.${containerId}`, instance)
   ).width
+  // 初始化列高度状态
+  initColumns()
 })
 
 // ==================== 加载状态管理 ====================
@@ -174,6 +176,50 @@ const items: WaterfallItemInfo[] = []
 const pendingItems: WaterfallItemInfo[] = []
 
 /**
+ * 列高度状态管理
+ * 直接维护每列的当前高度，避免重复计算
+ * 使用 reactive 确保对象内部属性变化能触发响应式更新
+ */
+const columns = reactive<{ colIndex: number; height: number }[]>([])
+
+/**
+ * 初始化列高度状态
+ */
+const initColumns = () => {
+  columns.length = 0 // 清空数组
+  columns.push(
+    ...Array(props.columns)
+      .fill(0)
+      .map((_, index) => ({ colIndex: index, height: 0 })),
+  )
+}
+
+/**
+ * 重置所有列的高度为0
+ */
+const resetColumnsHeight = () => {
+  columns.forEach((column) => {
+    column.height = 0
+  })
+}
+
+/**
+ * 获取当前最短的列（实时计算，避免异步问题）
+ * 不使用计算属性，确保每次都能获取到最新的列状态
+ */
+const getMinColumn = () => {
+  if (columns.length === 0) return null
+
+  let min = columns[0]
+  for (let i = 1; i < columns.length; i++) {
+    if (columns[i].height < min.height) {
+      min = columns[i]
+    }
+  }
+  return min
+}
+
+/**
  * 添加瀑布流项目
  * 当子组件挂载时调用，将项目信息添加到列表中
  * @param item 项目信息对象
@@ -213,37 +259,6 @@ const removeItem = (item: WaterfallItemInfo) => {
 // ==================== 瀑布流布局算法 ====================
 
 /**
- * 获取当前列的高度状态
- * 根据已排版的项目计算每列的当前高度
- */
-const getColumnsHeight = () => {
-  const columns = Array(props.columns)
-    .fill(0)
-    .map((_, index) => ({ colIndex: index, height: 0 }))
-
-  // 遍历已可见的项目，计算每列的实际高度
-  items
-    .filter((item) => item.visible)
-    .forEach((item) => {
-      // 根据 left 位置计算列索引
-      // 反推公式：colIndex = left / (columnGap + columnWidth)
-      const colIndex = Math.round(
-        item.left / (props.columnGap + columnWidth.value),
-      )
-
-      if (columns[colIndex] !== undefined) {
-        const itemBottom = item.top + item.height
-        columns[colIndex].height = Math.max(
-          columns[colIndex].height,
-          itemBottom,
-        )
-      }
-    })
-
-  return columns
-}
-
-/**
  * 处理排版队列
  * 从 pendingItems 队列中取出项目进行排版
  */
@@ -252,9 +267,6 @@ const processQueue = throttle(async () => {
   if (!isActive.value) {
     return
   }
-
-  // 获取当前列的高度状态（基于已排版的项目）
-  const columns = getColumnsHeight()
 
   // 处理队列中的项目
   while (pendingItems.length > 0) {
@@ -273,32 +285,49 @@ const processQueue = throttle(async () => {
     try {
       // 执行项目的预处理（如获取尺寸）
       await item.beforeReflow()
-    } catch {
-      // 如果获取尺寸失败（页面可能不活跃），停止排版
+
+      // 验证高度是否有效
+      if (item.height <= 0) {
+        console.warn('项目高度无效:', item.height, '跳过此项目')
+        pendingItems.shift() // 移除无效项目
+        continue
+      }
+    } catch (error) {
+      console.error('获取项目尺寸失败:', error)
+      // 如果获取尺寸失败，停止排版
       break
     }
+    // debugger
+    // 获取当前最短的列（实时计算）
+    const shortestColumn = getMinColumn()
 
-    // 找到当前最短的列
-    columns.sort((a, b) => a.height - b.height)
-    const minColumn = columns[0]
-
-    if (!minColumn) break
+    if (!shortestColumn) break // 没有列，停止排版
 
     // 计算项目位置
-    item.top = minColumn.height === 0 ? 0 : minColumn.height + props.rowGap
-    item.left = (props.columnGap + columnWidth.value) * minColumn.colIndex
+    item.top =
+      shortestColumn.height === 0 ? 0 : shortestColumn.height + props.rowGap
+    item.left = (props.columnGap + columnWidth.value) * shortestColumn.colIndex
     item.visible = true // 设置为可见
 
     // 更新该列的高度
-    minColumn.height = item.top + item.height
+    shortestColumn.height = item.top + item.height
+
+    // 调试信息（生产环境可移除）
+    const oldHeight = shortestColumn.height - item.height
+    console.log(
+      `项目排版 - 列${shortestColumn.colIndex}: ${oldHeight} → ${shortestColumn.height}, 项目top: ${item.top}, 项目高度: ${item.height}`,
+    )
 
     // 从队列中移除已排版的项目
     pendingItems.shift()
+
+    // 确保每个项目排版后都有一个微任务的间隔，避免竞态条件
+    await new Promise((resolve) => setTimeout(resolve, 0))
   }
 
   // 计算容器总高度（取最高列的高度）
   containerHeight.value = Math.max(...columns.map((col) => col.height), 0)
-}, 50) // 50ms 节流，避免频繁计算
+}, 16) // 减少节流时间到 16ms（约 60fps），提高响应性
 
 /**
  * 完整重新排版函数（仅在必要时使用）
@@ -314,6 +343,9 @@ const fullReflow = throttle(async () => {
   items.forEach((item) => {
     item.visible = false
   })
+
+  // 重置所有列的高度
+  resetColumnsHeight()
 
   // 重新构建待排版队列
   pendingItems.length = 0
@@ -353,6 +385,10 @@ const onItemLoad = () => {
  */
 watch([() => props.columns, () => props.columnGap, () => props.rowGap], () => {
   setTimeout(() => {
+    // 列数变化时重新初始化列状态
+    if (columns.length !== props.columns) {
+      initColumns()
+    }
     reflow(true) // 强制完整重排版
   }, 50) // 延迟执行，确保DOM更新完成
 })
