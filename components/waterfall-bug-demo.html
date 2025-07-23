@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>瀑布流最小列高度计算Bug复现Demo</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .demo-container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .waterfall {
+        position: relative;
+        border: 2px solid #ddd;
+        margin: 20px 0;
+      }
+      .waterfall-item {
+        position: absolute;
+        background: #f0f0f0;
+        border: 1px solid #ccc;
+        padding: 10px;
+        box-sizing: border-box;
+      }
+      .controls {
+        margin: 20px 0;
+      }
+      .controls button {
+        margin: 5px;
+        padding: 8px 16px;
+      }
+      .debug-info {
+        background: #f9f9f9;
+        padding: 15px;
+        margin: 10px 0;
+        border-left: 4px solid #007acc;
+        font-family: monospace;
+        white-space: pre-line;
+      }
+      .problem {
+        background: #ffe6e6;
+        border-left-color: #ff4444;
+      }
+      .solution {
+        background: #e6ffe6;
+        border-left-color: #44ff44;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="demo-container">
+        <h1>瀑布流最小列高度计算Bug复现Demo</h1>
+
+        <div class="debug-info problem">
+          <strong>问题描述：</strong>
+          在瀑布流布局中，有时候最小列高度没有正确累加，导致项目重叠或布局错乱。
+
+          <strong>问题原因：</strong>
+          1. 计算属性 minColumn 在异步循环中可能返回过期的引用 2.
+          Vue响应式更新有延迟，导致列高度状态不同步 3.
+          引用失效：更新列高度后，下次循环的 minColumn 可能还指向旧的最短列
+        </div>
+
+        <div class="controls">
+          <button @click="addItems(5)">添加5个项目</button>
+          <button @click="addItems(10)">添加10个项目</button>
+          <button @click="clearItems">清空</button>
+          <button @click="toggleVersion">
+            切换版本: {{ useBuggyVersion ? '有Bug版本' : '修复版本' }}
+          </button>
+        </div>
+
+        <!-- 有Bug的版本 -->
+        <div v-if="useBuggyVersion">
+          <h2>❌ 有Bug版本 - 使用计算属性</h2>
+          <buggy-waterfall
+            ref="buggyWaterfall"
+            :items="items"
+            @debug="onDebug"
+          ></buggy-waterfall>
+        </div>
+
+        <!-- 修复后的版本 -->
+        <div v-else>
+          <h2>✅ 修复版本 - 每次重新获取最短列</h2>
+          <fixed-waterfall
+            ref="fixedWaterfall"
+            :items="items"
+            @debug="onDebug"
+          ></fixed-waterfall>
+        </div>
+
+        <div class="debug-info" v-if="debugInfo">
+          <strong>调试信息：</strong>
+          {{ debugInfo }}
+        </div>
+
+        <div class="debug-info solution">
+          <strong>解决方案：</strong>
+          1. 不要在异步循环中依赖计算属性的引用 2. 每次循环都重新调用
+          getMinColumn() 函数 3. 使用明确的列索引变量，避免引用混乱 4.
+          必要时添加 nextTick() 确保响应式更新完成
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, reactive, computed, nextTick } = Vue
+
+      // 有Bug的瀑布流组件
+      const BuggyWaterfall = {
+        props: ['items'],
+        emits: ['debug'],
+        setup(props, { emit }) {
+          const columns = reactive([
+            { colIndex: 0, height: 0 },
+            { colIndex: 1, height: 0 },
+            { colIndex: 2, height: 0 },
+          ])
+          const containerHeight = ref(0)
+          const columnWidth = 120
+          const columnGap = 10
+          const rowGap = 10
+
+          // 🐛 问题所在：使用计算属性获取最短列
+          const minColumn = computed(() => {
+            let min = columns[0]
+            for (let i = 1; i < columns.length; i++) {
+              if (columns[i].height < min.height) {
+                min = columns[i]
+              }
+            }
+            return min
+          })
+
+          const layout = async () => {
+            // 重置列高度
+            columns.forEach((col) => (col.height = 0))
+
+            let debugLog = '有Bug版本布局过程：\n'
+
+            for (let i = 0; i < props.items.length; i++) {
+              const item = props.items[i]
+
+              // 🐛 问题：在循环中使用计算属性的引用
+              const currentMin = minColumn.value
+              debugLog += `项目${i}: 选择列${currentMin.colIndex}(高度${currentMin.height}) `
+
+              item.top = currentMin.height + rowGap
+              item.left = (columnGap + columnWidth) * currentMin.colIndex
+
+              // 🐛 问题：更新列高度，但下次循环minColumn.value可能还是旧引用
+              columns[currentMin.colIndex].height = item.top + item.height
+
+              debugLog += `-> 更新后高度${columns[currentMin.colIndex].height}\n`
+
+              // 模拟异步操作
+              await new Promise((resolve) => setTimeout(resolve, 1))
+            }
+
+            containerHeight.value = Math.max(
+              ...columns.map((col) => col.height),
+            )
+            debugLog += `\n最终列高度: ${columns.map((col) => col.height).join(', ')}`
+            emit('debug', debugLog)
+          }
+
+          return { columns, containerHeight, columnWidth, layout }
+        },
+        template: `
+                <div class="waterfall" :style="{ height: containerHeight + 'px' }" @click="layout">
+                    <div 
+                        v-for="(item, index) in items" 
+                        :key="index"
+                        class="waterfall-item"
+                        :style="{ 
+                            width: columnWidth + 'px', 
+                            height: item.height + 'px',
+                            left: item.left + 'px',
+                            top: item.top + 'px',
+                            backgroundColor: item.color
+                        }"
+                    >
+                        项目 {{ index }} ({{ item.height }}px)
+                    </div>
+                    <div style="position: absolute; bottom: 5px; right: 5px; font-size: 12px;">
+                        点击重新布局
+                    </div>
+                </div>
+            `,
+      }
+
+      // 修复后的瀑布流组件
+      const FixedWaterfall = {
+        props: ['items'],
+        emits: ['debug'],
+        setup(props, { emit }) {
+          const columns = reactive([
+            { colIndex: 0, height: 0 },
+            { colIndex: 1, height: 0 },
+            { colIndex: 2, height: 0 },
+          ])
+          const containerHeight = ref(0)
+          const columnWidth = 120
+          const columnGap = 10
+          const rowGap = 10
+
+          // ✅ 解决方案：使用函数而不是计算属性
+          const getMinColumn = () => {
+            let min = columns[0]
+            for (let i = 1; i < columns.length; i++) {
+              if (columns[i].height < min.height) {
+                min = columns[i]
+              }
+            }
+            return min
+          }
+
+          const layout = async () => {
+            // 重置列高度
+            columns.forEach((col) => (col.height = 0))
+
+            let debugLog = '修复版本布局过程：\n'
+
+            for (let i = 0; i < props.items.length; i++) {
+              const item = props.items[i]
+
+              // ✅ 解决方案：每次循环都重新获取最短列
+              const currentMin = getMinColumn()
+              debugLog += `项目${i}: 选择列${currentMin.colIndex}(高度${currentMin.height}) `
+
+              item.top = currentMin.height + rowGap
+              item.left = (columnGap + columnWidth) * currentMin.colIndex
+
+              // ✅ 解决方案：使用明确的列索引
+              const targetColumnIndex = currentMin.colIndex
+              const newHeight = item.top + item.height
+              columns[targetColumnIndex].height = newHeight
+
+              debugLog += `-> 更新后高度${newHeight}\n`
+
+              // ✅ 解决方案：确保响应式更新完成
+              await nextTick()
+            }
+
+            containerHeight.value = Math.max(
+              ...columns.map((col) => col.height),
+            )
+            debugLog += `\n最终列高度: ${columns.map((col) => col.height).join(', ')}`
+            emit('debug', debugLog)
+          }
+
+          return { columns, containerHeight, columnWidth, layout }
+        },
+        template: `
+                <div class="waterfall" :style="{ height: containerHeight + 'px' }" @click="layout">
+                    <div 
+                        v-for="(item, index) in items" 
+                        :key="index"
+                        class="waterfall-item"
+                        :style="{ 
+                            width: columnWidth + 'px', 
+                            height: item.height + 'px',
+                            left: item.left + 'px',
+                            top: item.top + 'px',
+                            backgroundColor: item.color
+                        }"
+                    >
+                        项目 {{ index }} ({{ item.height }}px)
+                    </div>
+                    <div style="position: absolute; bottom: 5px; right: 5px; font-size: 12px;">
+                        点击重新布局
+                    </div>
+                </div>
+            `,
+      }
+
+      createApp({
+        components: {
+          BuggyWaterfall,
+          FixedWaterfall,
+        },
+        setup() {
+          const items = ref([])
+          const useBuggyVersion = ref(true)
+          const debugInfo = ref('')
+
+          const colors = [
+            '#ffcccb',
+            '#add8e6',
+            '#90ee90',
+            '#ffd700',
+            '#dda0dd',
+            '#f0e68c',
+          ]
+
+          const addItems = (count) => {
+            for (let i = 0; i < count; i++) {
+              items.value.push({
+                height: Math.floor(Math.random() * 100) + 50, // 50-150px随机高度
+                color: colors[Math.floor(Math.random() * colors.length)],
+                top: 0,
+                left: 0,
+              })
+            }
+            // 自动触发布局
+            setTimeout(() => {
+              const waterfall = useBuggyVersion.value
+                ? document.querySelector('.waterfall')
+                : document.querySelector('.waterfall')
+              if (waterfall) waterfall.click()
+            }, 100)
+          }
+
+          const clearItems = () => {
+            items.value = []
+            debugInfo.value = ''
+          }
+
+          const toggleVersion = () => {
+            useBuggyVersion.value = !useBuggyVersion.value
+            debugInfo.value = ''
+          }
+
+          const onDebug = (info) => {
+            debugInfo.value = info
+          }
+
+          // 初始化一些项目
+          addItems(8)
+
+          return {
+            items,
+            useBuggyVersion,
+            debugInfo,
+            addItems,
+            clearItems,
+            toggleVersion,
+            onDebug,
+          }
+        },
+      }).mount('#app')
+    </script>
+  </body>
+</html>
