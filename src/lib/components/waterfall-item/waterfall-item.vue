@@ -27,6 +27,7 @@ import {
   reactive,
   ref,
   watch,
+  nextTick,
 } from 'vue'
 import {
   classNames,
@@ -78,10 +79,12 @@ const itemId = uniqid()
  */
 const item = reactive<WaterfallItemInfo>({
   loaded: false, // 是否加载完成（图片等资源）
+  loadSuccess: false, // 是否加载成功
   visible: false, // 是否可见（由父组件控制）
   height: 0, // 项目高度（DOM 实际高度）
   top: 0, // 垂直位置（由父组件计算）
   left: 0, // 水平位置（由父组件计算）
+  index: props.index,
   beforeReflow: async () => {
     // 重排前的预处理：更新高度信息
     await updateHeight()
@@ -94,8 +97,17 @@ const item = reactive<WaterfallItemInfo>({
  */
 const updateHeight = async () => {
   try {
+    await nextTick() // 很重要不然会导致获取高度错误
     // 查询 DOM 元素的边界信息，获取实际高度
-    item.height = (await getBoundingClientRect(`.${itemId}`, instance)).height
+    const rect = await getBoundingClientRect(`.${itemId}`, instance)
+    item.height = rect.height === 0 ? 1 : rect.height
+    if (rect.height === 0 || !rect.height) {
+      item.height = 240 // todo 设置默认高度
+    } else {
+      item.height = rect.height
+    }
+    console.log('item.height', item.height, '---rect.height', rect.height)
+    item.loaded = true
   } catch {
     // 查询失败时静默处理，避免报错
     void 0
@@ -112,14 +124,16 @@ const context = inject(waterfallContextKey)!
 
 /**
  * 加载完成回调
- * 当项目内容（如图片）加载完成时调用
+ * 当项目内容（如图片）加载完成或失败时调用
  * 通知父组件进行重新布局
  */
-const onLoad = () => {
-  if (!item.loaded) {
-    item.loaded = true
-    context.onItemLoad() // 通知父组件项目已加载完成
-  }
+const onLoad = async (event?: any) => {
+  // 检查是否加载成功
+  item.loadSuccess = event?.type === 'load'
+
+  await item.beforeReflow()
+
+  context.onItemLoad(item) // 传递项目信息给父组件
 }
 
 // ==================== 生命周期管理 ====================
