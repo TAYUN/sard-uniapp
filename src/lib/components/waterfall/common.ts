@@ -8,6 +8,9 @@ export interface WaterfallProps {
   columns?: number
   columnGap?: number
   rowGap?: number
+  maxRetries?: number // 最大重试次数
+  retryDelay?: number // 重试延迟(ms)
+  fallbackHeight?: number // 加载失败时的备用高度
 }
 
 export const defaultWaterfallProps = defaultConfig.waterfall
@@ -19,6 +22,8 @@ export interface WaterfallSlots {
 export interface WaterfallEmits {
   (e: 'load'): void
   (e: 'loadstart'): void
+  // retry: (payload: { item: WaterfallItemInfo; retryCount: number }) => void
+  (e: 'retry'): void
 }
 
 export interface WaterfallExpose {
@@ -30,7 +35,7 @@ export interface WaterfallContext {
   columnWidth: number
   addItem: (item: WaterfallItemInfo) => void
   removeItem: (item: WaterfallItemInfo) => void
-  onItemLoad: () => void
+  onItemLoad: (item: WaterfallItemInfo) => void
 }
 
 export const waterfallContextKey = Symbol(
