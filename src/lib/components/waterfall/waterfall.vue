@@ -33,6 +33,7 @@ import {
   getBoundingClientRect,
   uniqid,
   throttle,
+  sleep,
 } from '../../utils'
 import {
   type WaterfallProps,
@@ -55,7 +56,7 @@ defineOptions({
 
 // 组件属性定义
 const props = withDefaults(defineProps<WaterfallProps>(), defaultWaterfallProps)
-
+console.log(props)
 // 插槽定义
 defineSlots<WaterfallSlots>()
 
@@ -139,25 +140,15 @@ const onLoad = (handler: () => void) => {
  * 检查所有项目的加载状态，更新整体加载状态并触发相应事件
  */
 const updateLoadStatus = () => {
-  // 检查是否有未加载完成的项目
-  const includeLoading = items.some((item) => !item.loaded)
-
-  if (includeLoading) {
-    // 有项目未加载完成
-    if (loadStatus === 'idle') {
-      loadStatus = 'busy'
-      emit('loadstart') // 触发加载开始事件
-    }
+  if (pendingItems.length === 0) {
+    // 执行所有等待的回调函数
+    loadedHandlers.forEach((handler) => handler())
+    loadedHandlers = []
+    loadStatus = 'idle'
+    emit('load') // 触发加载完成事件
   } else {
-    // 所有项目都已加载完成
-    if (loadStatus === 'busy') {
-      // 执行所有等待的回调函数
-      loadedHandlers.forEach((handler) => handler())
-      loadedHandlers = []
-
-      loadStatus = 'idle'
-      emit('load') // 触发加载完成事件
-    }
+    loadStatus = 'busy'
+    emit('loadstart') // 触发加载开始事件
   }
 }
 
@@ -218,7 +209,6 @@ const getMinColumn = () => {
   }
   return min
 }
-const minColumn = computed(() => getMinColumn())
 
 /**
  * 添加瀑布流项目
@@ -227,9 +217,8 @@ const minColumn = computed(() => getMinColumn())
  */
 const addItem = (item: WaterfallItemInfo) => {
   // 直接加入待排版队列
-  if (!pendingItems.includes(item)) {
-    pendingItems.push(item)
-  }
+  pendingItems.push(item)
+  items.push(item)
 }
 
 /**
@@ -241,7 +230,6 @@ const removeItem = (item: WaterfallItemInfo) => {
   if (items.includes(item)) {
     items.splice(items.indexOf(item), 1)
     // todo 调度器重排后面的
-    updateLoadStatus() // 更新加载状态
   }
 }
 
@@ -256,7 +244,7 @@ const processQueue = throttle(async () => {
   if (!isActive.value) {
     return
   }
-
+  updateLoadStatus()
   // 处理队列中的项目
   while (pendingItems.length > 0) {
     // 如果页面在排版过程中变为不活跃，停止排版
@@ -271,84 +259,87 @@ const processQueue = throttle(async () => {
     // 检查项目是否已加载
     if (!item.loaded) {
       // 创建一个 Promise 等待加载完成
-      await new Promise<void>((resolve) => {
+      await new Promise((resolve) => {
         // 创建一个监听器
         const unwatch = watch(
           () => item.loaded,
           (newLoaded) => {
             if (newLoaded) {
               unwatch() // 停止监听
-              resolve() // 解决 Promise
+              resolve(true) // 解决 Promise
             }
           },
         )
-
         // 设置超时，避免永久等待
-        setTimeout(() => {
-          unwatch()
-          console.warn('项目加载超时，强制继续')
-          resolve()
-        }, 5000)
+        // 子组件已经设置超时，这里就不需要了
       })
+      // setTimeout(() => {
+      //   unwatch()
+      //   console.warn(`${item.index}项目加载超时，不要了，跳过`)
+      //   resolve(false)
+      // }, 100)
+      // if (!res) {
+      //   // 从队列中移除已排版的项目
+      //   pendingItems.shift()
+      //   continue
+      // }
     }
 
-    try {
-      // 执行项目的预处理（如获取尺寸）
-      await item.beforeReflow()
-
-      // 验证高度是否有效
-      if (item.height <= 0) {
-        console.warn('项目高度无效:', item.height, '跳过此项目')
-        pendingItems.shift() // 移除无效项目
-        continue
-      }
-    } catch (error) {
-      console.error('获取项目尺寸失败:', error)
-      // 如果获取尺寸失败，停止排版
-      break
-    }
-
+    // 【修复】每次循环都重新获取最短列，避免引用失效问题
+    const currentMinColumn = getMinColumn()
     // 计算项目位置
-    item.top = minColumn.value.height + props.rowGap
-    item.left = (props.columnGap + columnWidth.value) * minColumn.value.colIndex
-    item.visible = true // 设置为可见
+    item.top = currentMinColumn.height + props.rowGap
+    item.left =
+      (props.columnGap + columnWidth.value) * currentMinColumn.colIndex
 
-    // 更新该列的高度
-    columns[minColumn.value.colIndex].height = item.top + item.height
+    // 【修复】直接使用获取到的列索引更新高度，确保更新的是正确的列
+    const targetColumnIndex = currentMinColumn.colIndex
+    const newHeight = item.top + item.height
+    columns[targetColumnIndex].height = newHeight
+
+    item.visible = true // 设置为可见
     // 从队列中移除已排版的项目
     pendingItems.shift()
-    // 确保每个项目排版后都有一个微任务的间隔，避免竞态条件
-    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // 【可选】添加微任务延迟，确保响应式更新生效
+    await nextTick()
   }
 
   // 计算容器总高度（取最高列的高度）
   containerHeight.value = Math.max(...columns.map((col) => col.height), 0)
+  // 更新加载状态
+  updateLoadStatus()
 }, 16) // 减少节流时间到 16ms（约 60fps），提高响应性
 
+const getItemHeight = async (items: WaterfallItemInfo[]) => {
+  // 重置所有项目的可见状态
+  items.forEach((item) => {
+    item.visible = false
+    item.height = 0
+    item.loaded = false
+    item.beforeReflow()
+  })
+}
 /**
  * 完整重新排版函数（仅在必要时使用）
  * 重新排版所有项目，用于列数变化等需要完全重新布局的场景
  */
 const fullReflow = throttle(async () => {
   // 如果页面不活跃，暂停排版
-  if (!isActive.value) {
+  console.log('isActive.value', isActive.value, 'loadStatus', loadStatus)
+  if (!isActive.value || loadStatus === 'busy') {
     return
   }
-
-  // 重置所有项目的可见状态
-  items.forEach((item) => {
-    item.visible = false
-  })
-
+  // 重新获取所有项目高度
+  getItemHeight(items)
   // 重置所有列的高度
   resetColumnsHeight()
-
+  await sleep(500)
   // 重新构建待排版队列
   pendingItems.length = 0
   pendingItems.push(...items)
-
-  // todo 交给调度器排列
-}, 50)
+  reflow(false)
+}, 500)
 
 /**
  * 主排版函数
@@ -364,10 +355,28 @@ const reflow = (force = true) => {
 
 /**
  * 项目加载完成回调
- * 当子组件的内容（如图片）加载完成时调用
+ * 当子组件的内容（如图片）加载完成或失败时调用
  */
-const onItemLoad = () => {
-  updateLoadStatus() // 更新加载状态
+const onItemLoad = (item: WaterfallItemInfo) => {
+  console.log(item)
+  // // 如果加载失败且允许重试
+  // if (!item.loadSuccess && props.maxRetries > 0) {
+  //   // 初始化重试计数
+  //   if (item.retryCount === undefined) {
+  //     item.retryCount = 0
+  //   }
+  //   // 如果未超过最大重试次数，自动重试
+  //   if (item.retryCount < props.maxRetries) {
+  //     item.retryCount++
+  //     item.loaded = false // 重置加载状态
+  //     // 延迟重试
+  //     setTimeout(() => {
+  //       // 触发重试逻辑
+  //       // emit('retry', { item, retryCount: item.retryCount })
+  //     }, props.retryDelay)
+  //     return
+  //   }
+  // }
 }
 
 // ==================== 响应式监听 ====================
@@ -381,8 +390,8 @@ watch([() => props.columns, () => props.columnGap, () => props.rowGap], () => {
     // 列数变化时重新初始化列状态
     if (columns.length !== props.columns) {
       initColumns()
+      reflow(true) // 强制完整重排版
     }
-    reflow(true) // 强制完整重排版
   }, 50) // 延迟执行，确保DOM更新完成
 })
 
@@ -406,7 +415,6 @@ watch(
     immediate: true,
   },
 )
-
 onShow(() => {
   isActive.value = true
 })
