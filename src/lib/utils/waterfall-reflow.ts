@@ -57,8 +57,8 @@ export function reflow(
     const height = width / snap.aspect
 
     // 计算新坐标
-    const left = shortestColIndex * (columnWidth + columnGap)
-    const top = colHeights[shortestColIndex] + (colHeights[shortestColIndex] ? rowGap : 0)
+    const left = shortestColIndex * columnWidth + shortestColIndex * columnGap
+    const top = colHeights[shortestColIndex] + (colHeights[shortestColIndex] > 0 ? rowGap : 0)
 
     items.push({
       id: snap.id,
