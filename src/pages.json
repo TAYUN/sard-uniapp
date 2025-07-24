@@ -472,6 +472,21 @@
         },
         {
           "path": "waterfall/demo/SmoothReflow"
+        },
+        {
+          "path": "waterfall/demo/OptimizationComparison"
+        },
+        {
+          "path": "waterfall/demo/ReflowDemo"
+        },
+        {
+          "path": "waterfall/demo/PerformanceComparison"
+        },
+        {
+          "path": "waterfall/demo/ReflowOptimizationDemo"
+        },
+        {
+          "path": "waterfall/demo/SimpleReflowDemo"
         }
       ]
     }
