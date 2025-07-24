@@ -406,7 +406,7 @@ button {
 
 .table-header,
 .table-row {
-  display: flex;
+  display: flex !important;
   padding: 15rpx;
 
   text {
