@@ -37,11 +37,15 @@ const demoList: DemoItem[] = [
   },
   {
     title: '对比',
-    path: '/pages/components/waterfall/demo/OptimizationComparison',
+    path: '/pages/components/waterfall/demo/TrueOptimizationComparison',
   },
   { title: '列数', path: '/pages/components/waterfall/demo/Columns' },
   { title: '动画', path: '/pages/components/waterfall/demo/ReflowAnimation' },
-  { title: '平滑', path: '/pages/components/waterfall/demo/SmoothReflow' },
+  // { title: '平滑', path: '/pages/components/waterfall/demo/SmoothReflow' },
+  // {
+  //   title: '对比旧',
+  //   path: '/pages/components/waterfall/demo/OptimizationComparison',
+  // },
   // { title: '已知', path: '/pages/components/waterfall/demo/KnownSize' },
   // { title: '刷新', path: '/pages/components/waterfall/demo/Dynamic' },
   // { title: '等待', path: '/pages/components/waterfall/demo/MaxWait' },
