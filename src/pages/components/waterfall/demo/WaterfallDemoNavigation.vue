@@ -28,6 +28,7 @@ const demoList: DemoItem[] = [
   { title: '列数', path: '/pages/components/waterfall/demo/Columns' },
   { title: '刷新', path: '/pages/components/waterfall/demo/Dynamic' },
   { title: '动画', path: '/pages/components/waterfall/demo/ReflowAnimation' },
+  { title: '平滑', path: '/pages/components/waterfall/demo/SmoothReflow' },
   { title: '已知', path: '/pages/components/waterfall/demo/KnownSize' },
   { title: '等待', path: '/pages/components/waterfall/demo/MaxWait' },
   { title: '大图', path: '/pages/components/waterfall/demo/BigImage' },

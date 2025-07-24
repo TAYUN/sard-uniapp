@@ -469,6 +469,9 @@
         },
         {
           "path": "waterfall/demo/ReflowAnimation"
+        },
+        {
+          "path": "waterfall/demo/SmoothReflow"
         }
       ]
     }
