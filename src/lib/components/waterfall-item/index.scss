@@ -18,4 +18,13 @@
     opacity: 1;
     transform: translateY(0) scale(1); // 最终状态：正常位置和大小
   }
+
+  @include m(reflowing) {
+    // 重排状态：保持可见，使用更快的过渡
+    opacity: 1;
+    transition:
+      opacity var(--sar-waterfall-reflow-duration) ease-out,
+      transform var(--sar-waterfall-reflow-duration)
+        cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
 }

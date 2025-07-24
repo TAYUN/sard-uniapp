@@ -1,7 +1,8 @@
 @use '../style/base' as *;
 
 :root {
-  --sar-waterfall-duration: 0.4s;
+  --sar-waterfall-duration: 0.25s;
+  --sar-waterfall-reflow-duration: 0.15s;
 }
 
 @include bem(waterfall) {

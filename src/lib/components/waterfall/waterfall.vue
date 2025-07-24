@@ -111,6 +111,11 @@ onMounted(async () => {
 let loadStatus: 'idle' | 'busy' = 'idle'
 
 /**
+ * 重排状态：用于控制重排时的动画效果
+ */
+const isReflowing = ref(false)
+
+/**
  * 加载完成后的回调函数队列
  * 当所有项目加载完成时，会依次执行这些回调
  */
@@ -247,6 +252,13 @@ const processQueue = throttle(async () => {
 
   let processedCount = 0 // 已处理的项目数量
 
+  // 如果是完整重排，先隐藏所有待处理的项目
+  if (pendingItems.length > 0) {
+    pendingItems.forEach((item) => {
+      item.visible = false
+    })
+  }
+
   // 处理队列中的项目
   while (pendingItems.length > 0) {
     // 如果页面在排版过程中变为不活跃，停止排版
@@ -324,14 +336,35 @@ const processQueue = throttle(async () => {
 
   // 计算容器总高度（取最高列的高度）
   containerHeight.value = Math.max(...columns.map((col) => col.height), 0)
+
+  // 所有项目处理完成后，清除全局重排状态
+  if (pendingItems.length === 0) {
+    // 延迟清除重排状态，确保最后一个项目的动画也完成
+    setTimeout(() => {
+      isReflowing.value = false
+    }, 600) // 稍微超过最大动画延迟时间
+  }
+
   // 更新加载状态
   updateLoadStatus()
 }, 16) // 减少节流时间到 16ms（约 60fps），提高响应性
 
-const getItemHeight = async (items: WaterfallItemInfo[]) => {
-  // 重置所有项目的可见状态
+const getItemHeight = async (
+  items: WaterfallItemInfo[],
+  smoothTransition = false,
+) => {
+  // 设置全局重排状态
+  isReflowing.value = smoothTransition
+
+  // 重置项目状态
   items.forEach((item, index) => {
-    item.visible = false
+    if (smoothTransition) {
+      // 平滑过渡模式：保持可见性，避免闪烁
+      // 不重置 visible 状态，让项目保持可见
+    } else {
+      // 普通模式：重置可见性
+      item.visible = false
+    }
     item.height = 0
     item.loaded = false
     item.animationDelay = index * 50 // 为每个项目设置不同的动画延迟
@@ -347,14 +380,69 @@ const fullReflow = throttle(async () => {
   if (!isActive.value) {
     return
   }
+
+  // 设置全局重排状态
+  isReflowing.value = true
+
+  // 重置所有项目的动画延迟
+  items.forEach((item) => {
+    item.animationDelay = 0
+  })
+
   // 重置所有列的高度
   resetColumnsHeight()
   // 重新构建待排版队列
   pendingItems.length = 0
-  // 重新获取所有项目高度
-  getItemHeight(items)
+  // fullReflow 也使用平滑过渡，避免闪烁
+  getItemHeight(items, true)
   pendingItems.push(...items)
   reflow(false)
+}, 50)
+
+/**
+ * 平滑重排函数
+ * 用于列数变化等场景，避免闪烁效果
+ */
+const smoothReflow = throttle(async () => {
+  // 如果页面不活跃，暂停排版
+  if (!isActive.value) {
+    return
+  }
+
+  // 设置全局重排状态
+  isReflowing.value = true
+
+  // 重置所有项目的动画延迟
+  items.forEach((item) => {
+    item.animationDelay = 0
+  })
+
+  // 立即开始重排
+  resetColumnsHeight()
+  pendingItems.length = 0
+  getItemHeight(items, true)
+  pendingItems.push(...items)
+  processQueue()
+}, 100)
+
+/**
+ * 初始重排函数
+ * 用于初始加载等不需要平滑过渡的场景
+ */
+const initialReflow = throttle(async () => {
+  // 如果页面不活跃，暂停排版
+  if (!isActive.value) {
+    return
+  }
+
+  // 重置所有列的高度
+  resetColumnsHeight()
+  // 重新构建待排版队列
+  pendingItems.length = 0
+  // 不使用平滑过渡
+  getItemHeight(items, false)
+  pendingItems.push(...items)
+  processQueue()
 }, 50)
 
 /**
@@ -401,15 +489,32 @@ const onItemLoad = (item: WaterfallItemInfo) => {
  * 监听布局相关属性变化
  * 当列数、列间距、行间距发生变化时，需要完整重新排版
  */
-watch([() => props.columns, () => props.columnGap, () => props.rowGap], () => {
-  setTimeout(() => {
-    // 列数变化时重新初始化列状态
-    if (columns.length !== props.columns) {
-      initColumns()
-      reflow(true) // 强制完整重排版
-    }
-  }, 50) // 延迟执行，确保DOM更新完成
-})
+watch(
+  [() => props.columns, () => props.columnGap, () => props.rowGap],
+  (newValues, oldValues) => {
+    const [newColumns] = newValues
+    const [oldColumns] = oldValues || []
+
+    setTimeout(() => {
+      // 列数变化时重新初始化列状态
+      if (columns.length !== newColumns) {
+        initColumns()
+        // 如果是列数变化，使用平滑重排，避免闪烁
+        if (oldColumns && oldColumns !== newColumns) {
+          smoothReflow()
+        } else {
+          // 初始化或其他情况，检查是否有可见项目
+          const hasVisibleItems = items.some((item) => item.visible)
+          if (hasVisibleItems) {
+            fullReflow() // 有可见项目时使用平滑重排
+          } else {
+            initialReflow() // 初始加载时使用非平滑重排
+          }
+        }
+      }
+    }, 50) // 延迟执行，确保DOM更新完成
+  },
+)
 
 /**
  * 监听页面活跃状态变化
@@ -452,6 +557,7 @@ provide(
     removeItem, // 移除项目方法
     onItemLoad, // 项目加载完成回调
     columnWidth, // 列宽度（响应式）
+    isReflowing, // 全局重排状态（响应式）
   }),
 )
 
@@ -462,7 +568,10 @@ provide(
  * 父组件可以通过 ref 调用这些方法
  */
 defineExpose<WaterfallExpose>({
-  reflow, // 手动触发重排
+  reflow, // 手动触发重排（智能选择）
+  fullReflow, // 强制完整重排（平滑）
+  smoothReflow, // 平滑重排
+  initialReflow, // 初始重排（非平滑）
   onLoad, // 注册加载完成回调
 })
 

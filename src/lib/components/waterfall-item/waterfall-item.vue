@@ -199,7 +199,8 @@ watch(
 const waterfallItemClass = computed(() => {
   return classNames(
     bem.b(), // 基础类名：sar-waterfall-item
-    bem.m('show', item.visible), // 显示状态：sar-waterfall-item--show
+    bem.m('show', item.visible || context.isReflowing), // 显示状态：重排时也保持可见
+    bem.m('reflowing', context.isReflowing), // 重排状态类名
     itemId, // 唯一ID，用于DOM查询
     props.rootClass, // 用户自定义类名
   )
