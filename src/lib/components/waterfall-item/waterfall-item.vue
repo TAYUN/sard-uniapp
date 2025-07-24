@@ -85,6 +85,7 @@ const item = reactive<WaterfallItemInfo>({
   top: 0, // 垂直位置（由父组件计算）
   left: 0, // 水平位置（由父组件计算）
   index: props.index,
+  animationDelay: 0, // 动画延迟时间
   beforeReflow: async () => {
     // 重排前的预处理：更新高度信息
     await updateHeight()
@@ -106,7 +107,6 @@ const updateHeight = async () => {
     } else {
       item.height = rect.height
     }
-    console.log('item.height', item.height, '---rect.height', rect.height)
     item.loaded = true
   } catch {
     // 查询失败时静默处理，避免报错
@@ -162,9 +162,10 @@ const laterVisible = ref(false)
 
 /**
  * 延迟定时器
- * 项目变为可见后，延迟 100ms 启用 transform 动画
+ * 项目变为可见后，根据动画延迟启用 transform 动画
+ * start,stop
  */
-const { start } = useTimeout(() => {
+const { stop } = useTimeout(() => {
   laterVisible.value = true
 }, 100)
 
@@ -176,10 +177,14 @@ watch(
   () => item.visible,
   () => {
     if (item.visible) {
-      // 项目变为可见时，启动延迟定时器
-      start()
+      // 项目变为可见时，启动延迟定时器启用 transform 动画
+      stop() // 停止之前的定时器
+      setTimeout(() => {
+        laterVisible.value = true
+      }, 100) // 固定100ms延迟，用于启用transform动画
     } else {
       // 项目隐藏时，立即禁用延迟动画
+      stop()
       laterVisible.value = false
     }
   },
@@ -215,8 +220,8 @@ const waterfallItemStyle = computed(() => {
 
       // 过渡动画：根据延迟状态决定是否包含 transform 动画
       transition: laterVisible.value
-        ? `opacity var(--sar-waterfall-duration),transform var(--sar-waterfall-duration)` // 包含位置动画
-        : `opacity var(--sar-waterfall-duration)`, // 仅包含透明度动画
+        ? `opacity var(--sar-waterfall-duration) ease-out,transform var(--sar-waterfall-duration) ease-out` // 包含位置动画，使用缓出效果
+        : `opacity var(--sar-waterfall-duration) ease-out`, // 仅包含透明度动画
     },
     props.rootStyle, // 用户自定义样式
   )

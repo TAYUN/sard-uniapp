@@ -23,5 +23,6 @@ export interface WaterfallItemInfo {
   left: number // 水平位置
   index: number // 项目索引
   retryCount?: number // 重试次数
+  animationDelay?: number // 动画延迟时间（毫秒）
   beforeReflow: () => Promise<void> // 重排前的预处理
 }
