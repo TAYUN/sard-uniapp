@@ -25,13 +25,27 @@ interface DemoItem {
 const demoList: DemoItem[] = [
   { title: '基础', path: '/pages/components/waterfall/demo/Basic' },
   { title: '真实', path: '/pages/components/waterfall/demo/TrueCase' },
+  { title: '简化', path: '/pages/components/waterfall/demo/SimpleReflowDemo' },
+  { title: '重排', path: '/pages/components/waterfall/demo/ReflowDemo' },
+  {
+    title: '性能',
+    path: '/pages/components/waterfall/demo/PerformanceComparison',
+  },
+  {
+    title: '优化',
+    path: '/pages/components/waterfall/demo/ReflowOptimizationDemo',
+  },
+  {
+    title: '对比',
+    path: '/pages/components/waterfall/demo/OptimizationComparison',
+  },
   { title: '列数', path: '/pages/components/waterfall/demo/Columns' },
-  { title: '刷新', path: '/pages/components/waterfall/demo/Dynamic' },
   { title: '动画', path: '/pages/components/waterfall/demo/ReflowAnimation' },
   { title: '平滑', path: '/pages/components/waterfall/demo/SmoothReflow' },
-  { title: '已知', path: '/pages/components/waterfall/demo/KnownSize' },
-  { title: '等待', path: '/pages/components/waterfall/demo/MaxWait' },
-  { title: '大图', path: '/pages/components/waterfall/demo/BigImage' },
+  // { title: '已知', path: '/pages/components/waterfall/demo/KnownSize' },
+  // { title: '刷新', path: '/pages/components/waterfall/demo/Dynamic' },
+  // { title: '等待', path: '/pages/components/waterfall/demo/MaxWait' },
+  // { title: '大图', path: '/pages/components/waterfall/demo/BigImage' },
 ]
 
 const navigateToDemo = (path: string) => {
