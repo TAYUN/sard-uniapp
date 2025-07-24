@@ -487,6 +487,9 @@
         },
         {
           "path": "waterfall/demo/SimpleReflowDemo"
+        },
+        {
+          "path": "waterfall/demo/TrueOptimizationComparison"
         }
       ]
     }
