@@ -33,7 +33,6 @@ import {
   getBoundingClientRect,
   uniqid,
   throttle,
-  sleep,
 } from '../../utils'
 import {
   type WaterfallProps,
@@ -245,6 +244,9 @@ const processQueue = throttle(async () => {
     return
   }
   updateLoadStatus()
+
+  let processedCount = 0 // 已处理的项目数量
+
   // 处理队列中的项目
   while (pendingItems.length > 0) {
     // 如果页面在排版过程中变为不活跃，停止排版
@@ -259,20 +261,21 @@ const processQueue = throttle(async () => {
     // 检查项目是否已加载
     if (!item.loaded) {
       // 创建一个 Promise 等待加载完成
-      await new Promise((resolve) => {
+      await new Promise<void>((resolve) => {
         // 创建一个监听器
         const unwatch = watch(
           () => item.loaded,
           (newLoaded) => {
             if (newLoaded) {
               unwatch() // 停止监听
-              resolve(true) // 解决 Promise
+              resolve() // 解决 Promise
             }
           },
+          { immediate: true }, // 立即检查一次，防止竞态条件
         )
-        // 设置超时，避免永久等待
-        // 子组件已经设置超时，这里就不需要了
       })
+      // 设置超时，避免永久等待
+      // 子组件已经设置超时，这里就不需要了
       // setTimeout(() => {
       //   unwatch()
       //   console.warn(`${item.index}项目加载超时，不要了，跳过`)
@@ -297,7 +300,21 @@ const processQueue = throttle(async () => {
     const newHeight = item.top + item.height
     columns[targetColumnIndex].height = newHeight
 
-    item.visible = true // 设置为可见
+    // 设置动画延迟，基于处理顺序和列位置
+    const baseDelay = processedCount * 20 // 基础延迟：每个项目20ms
+    const columnDelay = targetColumnIndex * 10 // 列延迟：不同列稍微错开
+    item.animationDelay = baseDelay + columnDelay
+
+    // 延迟设置可见状态，创建错开的动画效果
+    setTimeout(
+      () => {
+        item.visible = true
+      },
+      Math.min(item.animationDelay || 0, 500),
+    ) // 最大延迟不超过500ms
+
+    processedCount++
+
     // 从队列中移除已排版的项目
     pendingItems.shift()
 
@@ -313,10 +330,11 @@ const processQueue = throttle(async () => {
 
 const getItemHeight = async (items: WaterfallItemInfo[]) => {
   // 重置所有项目的可见状态
-  items.forEach((item) => {
+  items.forEach((item, index) => {
     item.visible = false
     item.height = 0
     item.loaded = false
+    item.animationDelay = index * 50 // 为每个项目设置不同的动画延迟
     item.beforeReflow()
   })
 }
@@ -326,20 +344,18 @@ const getItemHeight = async (items: WaterfallItemInfo[]) => {
  */
 const fullReflow = throttle(async () => {
   // 如果页面不活跃，暂停排版
-  console.log('isActive.value', isActive.value, 'loadStatus', loadStatus)
-  if (!isActive.value || loadStatus === 'busy') {
+  if (!isActive.value) {
     return
   }
-  // 重新获取所有项目高度
-  getItemHeight(items)
   // 重置所有列的高度
   resetColumnsHeight()
-  await sleep(500)
   // 重新构建待排版队列
   pendingItems.length = 0
+  // 重新获取所有项目高度
+  getItemHeight(items)
   pendingItems.push(...items)
   reflow(false)
-}, 500)
+}, 50)
 
 /**
  * 主排版函数
@@ -358,7 +374,7 @@ const reflow = (force = true) => {
  * 当子组件的内容（如图片）加载完成或失败时调用
  */
 const onItemLoad = (item: WaterfallItemInfo) => {
-  console.log(item)
+  void item.height
   // // 如果加载失败且允许重试
   // if (!item.loadSuccess && props.maxRetries > 0) {
   //   // 初始化重试计数
