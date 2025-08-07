@@ -56,7 +56,6 @@ defineOptions({
 
 // 组件属性定义
 const props = withDefaults(defineProps<WaterfallProps>(), defaultWaterfallProps)
-console.log(props)
 // 插槽定义
 defineSlots<WaterfallSlots>()
 
@@ -223,6 +222,10 @@ const getMinColumn = () => {
 const addItem = (item: WaterfallItemInfo) => {
   // 直接加入待排版队列
   pendingItems.push(item)
+  // 触发首次开始排版 todo 会不会和isactive冲突并发？
+  if (loadStatus === 'idle') {
+    reflow()
+  }
   items.push(item)
 }
 
@@ -233,8 +236,9 @@ const addItem = (item: WaterfallItemInfo) => {
  */
 const removeItem = (item: WaterfallItemInfo) => {
   if (items.includes(item)) {
-    items.splice(items.indexOf(item), 1)
-    // todo 调度器重排后面的
+    const index = items.indexOf(item)
+    items.splice(index, 1)
+    // todo 使用无dom操作，结合算法重排后面的
   }
 }
 
@@ -245,11 +249,13 @@ const removeItem = (item: WaterfallItemInfo) => {
  * 从 pendingItems 队列中取出项目进行排版
  */
 const processQueue = async () => {
+  updateLoadStatus()
+  if (pendingItems.length === 0) return
   // 如果页面不活跃，暂停排版
   if (!isActive.value) {
+    console.log('页面不活跃，暂停排版')
     return
   }
-  updateLoadStatus()
 
   // let processedCount = 0 // 已处理的项目数量
 
@@ -440,9 +446,10 @@ watch(
     // 页面变为不活跃时不需要特殊处理，processQueue 会自动停止
   },
   {
-    immediate: true,
+    immediate: false,
   },
 )
+
 onShow(() => {
   isActive.value = true
 })
