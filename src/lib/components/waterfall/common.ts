@@ -27,10 +27,8 @@ export interface WaterfallEmits {
 }
 
 export interface WaterfallExpose {
-  reflow: () => void // 智能重排
-  fullReflow: () => void // 完整重排（平滑）
-  smoothReflow: () => void // 平滑重排
-  initialReflow: () => void // 初始重排（非平滑）
+  reflow: () => void // 增量重排（处理待排版队列）
+  fullReflow: () => void // 完整重排（重置所有状态）
   onLoad: (handler: () => void) => void
 }
 

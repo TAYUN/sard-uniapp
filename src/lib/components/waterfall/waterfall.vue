@@ -32,7 +32,8 @@ import {
   createBem,
   getBoundingClientRect,
   uniqid,
-  throttle,
+  // throttle,
+  debounce,
 } from '../../utils'
 import {
   type WaterfallProps,
@@ -192,11 +193,11 @@ const initColumns = () => {
 /**
  * 重置所有列的高度为0
  */
-const resetColumnsHeight = () => {
-  columns.forEach((column) => {
-    column.height = 0
-  })
-}
+// const resetColumnsHeight = () => {
+//   columns.forEach((column) => {
+//     column.height = 0
+//   })
+// }
 
 /**
  * 获取当前最短的列（实时计算，避免异步问题）
@@ -243,14 +244,14 @@ const removeItem = (item: WaterfallItemInfo) => {
  * 处理排版队列
  * 从 pendingItems 队列中取出项目进行排版
  */
-const processQueue = throttle(async () => {
+const processQueue = async () => {
   // 如果页面不活跃，暂停排版
   if (!isActive.value) {
     return
   }
   updateLoadStatus()
 
-  let processedCount = 0 // 已处理的项目数量
+  // let processedCount = 0 // 已处理的项目数量
 
   // 如果是完整重排，先隐藏所有待处理的项目
   if (pendingItems.length > 0) {
@@ -312,26 +313,16 @@ const processQueue = throttle(async () => {
     const newHeight = item.top + item.height
     columns[targetColumnIndex].height = newHeight
 
-    // 设置动画延迟，基于处理顺序和列位置
-    const baseDelay = processedCount * 20 // 基础延迟：每个项目20ms
-    const columnDelay = targetColumnIndex * 10 // 列延迟：不同列稍微错开
-    item.animationDelay = baseDelay + columnDelay
+    // 直接设置可见状态
+    item.visible = true
 
-    // 延迟设置可见状态，创建错开的动画效果
-    setTimeout(
-      () => {
-        item.visible = true
-      },
-      Math.min(item.animationDelay || 0, 500),
-    ) // 最大延迟不超过500ms
-
-    processedCount++
+    // processedCount++
 
     // 从队列中移除已排版的项目
     pendingItems.shift()
 
     // 【可选】添加微任务延迟，确保响应式更新生效
-    await nextTick()
+    // await nextTick()
   }
 
   // 计算容器总高度（取最高列的高度）
@@ -339,122 +330,59 @@ const processQueue = throttle(async () => {
 
   // 所有项目处理完成后，清除全局重排状态
   if (pendingItems.length === 0) {
-    // 延迟清除重排状态，确保最后一个项目的动画也完成
-    setTimeout(() => {
-      isReflowing.value = false
-    }, 600) // 稍微超过最大动画延迟时间
+    isReflowing.value = false
   }
 
   // 更新加载状态
   updateLoadStatus()
-}, 16) // 减少节流时间到 16ms（约 60fps），提高响应性
+}
 
-const getItemHeight = async (
-  items: WaterfallItemInfo[],
-  smoothTransition = false,
-) => {
+const resetItemsForReflow = async (items: WaterfallItemInfo[]) => {
   // 设置全局重排状态
-  isReflowing.value = smoothTransition
+  isReflowing.value = true
 
   // 重置项目状态
-  items.forEach((item, index) => {
-    if (smoothTransition) {
-      // 平滑过渡模式：保持可见性，避免闪烁
-      // 不重置 visible 状态，让项目保持可见
-    } else {
-      // 普通模式：重置可见性
-      item.visible = false
-    }
+  items.forEach((item) => {
+    item.visible = false // 重置可见性
     item.height = 0
     item.loaded = false
-    item.animationDelay = index * 50 // 为每个项目设置不同的动画延迟
     item.beforeReflow()
   })
 }
 /**
- * 完整重新排版函数（仅在必要时使用）
- * 重新排版所有项目，用于列数变化等需要完全重新布局的场景
+ * 完整重排函数
+ * 重置所有状态，重新排版所有项目
  */
-const fullReflow = throttle(async () => {
-  // 如果页面不活跃，暂停排版
-  if (!isActive.value) {
-    return
-  }
-
-  // 设置全局重排状态
-  isReflowing.value = true
-
-  // 重置所有项目的动画延迟
-  items.forEach((item) => {
-    item.animationDelay = 0
-  })
-
-  // 重置所有列的高度
-  resetColumnsHeight()
-  // 重新构建待排版队列
-  pendingItems.length = 0
-  // fullReflow 也使用平滑过渡，避免闪烁
-  getItemHeight(items, true)
-  pendingItems.push(...items)
-  reflow(false)
-}, 50)
-
-/**
- * 平滑重排函数
- * 用于列数变化等场景，避免闪烁效果
- */
-const smoothReflow = throttle(async () => {
-  // 如果页面不活跃，暂停排版
-  if (!isActive.value) {
-    return
-  }
-
-  // 设置全局重排状态
-  isReflowing.value = true
-
-  // 重置所有项目的动画延迟
-  items.forEach((item) => {
-    item.animationDelay = 0
-  })
-
-  // 立即开始重排
-  resetColumnsHeight()
-  pendingItems.length = 0
-  getItemHeight(items, true)
-  pendingItems.push(...items)
-  processQueue()
-}, 100)
-
-/**
- * 初始重排函数
- * 用于初始加载等不需要平滑过渡的场景
- */
-const initialReflow = throttle(async () => {
+const fullReflow = debounce(async () => {
   // 如果页面不活跃，暂停排版
   if (!isActive.value) {
     return
   }
 
   // 重置所有列的高度
-  resetColumnsHeight()
+  // resetColumnsHeight()
+  // 重置列
+  initColumns()
+
   // 重新构建待排版队列
   pendingItems.length = 0
-  // 不使用平滑过渡
-  getItemHeight(items, false)
+
+  // 重置所有项目状态
+  await resetItemsForReflow(items)
+
+  // 将所有项目加入待排版队列
   pendingItems.push(...items)
+
+  // 开始处理队列
   processQueue()
-}, 50)
+}, 16)
 
 /**
- * 主排版函数
- * 根据情况选择增量排版或完整重排版
+ * 增量重排函数
+ * 仅处理当前待排版队列中的项目
  */
-const reflow = (force = true) => {
-  if (force) {
-    return fullReflow()
-  } else {
-    return processQueue()
-  }
+const reflow = () => {
+  return processQueue()
 }
 
 /**
@@ -489,32 +417,11 @@ const onItemLoad = (item: WaterfallItemInfo) => {
  * 监听布局相关属性变化
  * 当列数、列间距、行间距发生变化时，需要完整重新排版
  */
-watch(
-  [() => props.columns, () => props.columnGap, () => props.rowGap],
-  (newValues, oldValues) => {
-    const [newColumns] = newValues
-    const [oldColumns] = oldValues || []
-
-    setTimeout(() => {
-      // 列数变化时重新初始化列状态
-      if (columns.length !== newColumns) {
-        initColumns()
-        // 如果是列数变化，使用平滑重排，避免闪烁
-        if (oldColumns && oldColumns !== newColumns) {
-          smoothReflow()
-        } else {
-          // 初始化或其他情况，检查是否有可见项目
-          const hasVisibleItems = items.some((item) => item.visible)
-          if (hasVisibleItems) {
-            fullReflow() // 有可见项目时使用平滑重排
-          } else {
-            initialReflow() // 初始加载时使用非平滑重排
-          }
-        }
-      }
-    }, 50) // 延迟执行，确保DOM更新完成
-  },
-)
+watch([() => props.columns, () => props.columnGap, () => props.rowGap], () => {
+  setTimeout(() => {
+    fullReflow()
+  }, 16)
+})
 
 /**
  * 监听页面活跃状态变化
@@ -526,8 +433,8 @@ watch(
     if (newActive && !oldActive) {
       // 页面从不活跃变为活跃，继续处理待排版队列
       setTimeout(() => {
-        // 交给调度器 排列
-        reflow(false)
+        // 页面激活后继续处理待排版队列
+        reflow()
       }, 100) // 延迟执行，确保页面完全激活
     }
     // 页面变为不活跃时不需要特殊处理，processQueue 会自动停止
@@ -568,10 +475,8 @@ provide(
  * 父组件可以通过 ref 调用这些方法
  */
 defineExpose<WaterfallExpose>({
-  reflow, // 手动触发重排（智能选择）
-  fullReflow, // 强制完整重排（平滑）
-  smoothReflow, // 平滑重排
-  initialReflow, // 初始重排（非平滑）
+  reflow, // 增量重排（处理待排版队列）
+  fullReflow, // 完整重排（重置所有状态）
   onLoad, // 注册加载完成回调
 })
 

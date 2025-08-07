@@ -153,7 +153,13 @@ const changeGap = (newGap: number) => {
 
 const triggerReflow = () => {
   if (waterfallRef.value) {
-    waterfallRef.value.fullReflow()
+    // waterfallRef.value.reflow()
+  }
+}
+
+const triggerFullReflow = () => {
+  if (waterfallRef.value) {
+    // waterfallRef.value.fullReflow()
   }
 }
 

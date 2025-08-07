@@ -85,7 +85,6 @@ const item = reactive<WaterfallItemInfo>({
   top: 0, // 垂直位置（由父组件计算）
   left: 0, // 水平位置（由父组件计算）
   index: props.index,
-  animationDelay: 0, // 动画延迟时间
   beforeReflow: async () => {
     // 重排前的预处理：更新高度信息
     await updateHeight()
@@ -154,37 +153,18 @@ onBeforeUnmount(() => {
 
 // ==================== 动画效果管理 ====================
 
-/**
- * 延迟显示状态
- * 用于控制 transform 动画的时机，避免初始位置闪烁
- */
 const laterVisible = ref(false)
 
-/**
- * 延迟定时器
- * 项目变为可见后，根据动画延迟启用 transform 动画
- * start,stop
- */
-const { stop } = useTimeout(() => {
+const { start } = useTimeout(() => {
   laterVisible.value = true
 }, 100)
 
-/**
- * 监听项目可见性变化
- * 控制动画效果的启用和禁用
- */
 watch(
   () => item.visible,
   () => {
     if (item.visible) {
-      // 项目变为可见时，启动延迟定时器启用 transform 动画
-      stop() // 停止之前的定时器
-      setTimeout(() => {
-        laterVisible.value = true
-      }, 100) // 固定100ms延迟，用于启用transform动画
+      start() // 自动处理清理和重新设置
     } else {
-      // 项目隐藏时，立即禁用延迟动画
-      stop()
       laterVisible.value = false
     }
   },
@@ -205,6 +185,15 @@ const waterfallItemClass = computed(() => {
     props.rootClass, // 用户自定义类名
   )
 })
+
+// const waterfallItemClass = computed(() => {
+//   return classNames(
+//     bem.b(),
+//     bem.m('show', item.visible),
+//     itemId,
+//     props.rootClass,
+//   )
+// })
 
 /**
  * 计算项目的内联样式
