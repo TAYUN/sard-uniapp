@@ -112,7 +112,6 @@ const onRefresh = () => {
 
         loadMoreStatus.value = 'loading'
         waterfallRef.value?.refreshReflow()
-        // debugger
         waterfallRef.value?.onLoad(() => {
           setTimeout(() => {
             loadMoreStatus.value =

@@ -258,7 +258,6 @@ const recalculateItemsAfterRemoval = () => {
     // 如果没有剩余项目，重置容器高度和列高度
     containerHeight.value = 0
     initColumns()
-    console.log('没有剩余项目，重置完成')
     return
   }
 
