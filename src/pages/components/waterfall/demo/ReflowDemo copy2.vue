@@ -36,35 +36,18 @@
       </view>
 
       <view class="demo-actions">
-        <button @click="addRandomItem" :disabled="loadingItems.size > 0">
-          {{ loadingItems.size > 0 ? '加载中...' : '添加随机项' }}
-        </button>
-        <button @click="insertRandomItem" :disabled="loadingItems.size > 0">
-          {{ loadingItems.size > 0 ? '加载中...' : '插入随机项' }}
-        </button>
+        <button @click="addRandomItem">添加随机项</button>
+        <button @click="insertRandomItem">插入随机项</button>
         <button @click="removeRandomItem">删除随机项</button>
-        <button @click="batchAddItems" :disabled="loadingItems.size > 0">
-          {{ loadingItems.size > 0 ? '加载中...' : '批量添加' }}
-        </button>
-        <button @click="resetItems" :disabled="loadingItems.size > 0">
-          {{ loadingItems.size > 0 ? '加载中...' : '重置' }}
-        </button>
+        <button @click="batchAddItems">批量添加</button>
+        <button @click="resetItems">重置</button>
       </view>
 
       <view class="demo-stats">
         <text>项目数量: {{ items.length }}</text>
         <text>容器高度: {{ Math.round(containerHeight) }}px</text>
         <text>重排耗时: {{ reflowTime }}ms</text>
-        <text v-if="loadingItems.size > 0" class="loading-text">
-          加载中: {{ loadingItems.size }}项
-        </text>
       </view>
-    </view>
-
-    <!-- 加载指示器 -->
-    <view v-if="loadingItems.size > 0" class="loading-indicator">
-      <view class="loading-spinner"></view>
-      <text>正在加载 {{ loadingItems.size }} 个项目...</text>
     </view>
 
     <view
@@ -118,7 +101,6 @@ const columns = ref(2)
 const columnGap = ref(10)
 const rowGap = ref(10)
 const reflowTime = ref(0)
-const loadingItems = ref(new Set<string | number>()) // 正在加载的项目ID
 
 // 初始数据
 const items = ref<WaterfallItem[]>([])
@@ -140,43 +122,16 @@ const {
   rowGap,
 })
 
-// 生成随机项目（同步版本，用于初始化）
-// const generateRandomItem = (id: string | number): WaterfallItem => {
-//   const width = 200 + Math.random() * 100 // 200-300px
-//   const height = 150 + Math.random() * 200 // 150-350px
-//   return { id, width, height }
-// }
-
-// 生成随机项目（异步版本，模拟图片加载延迟）
-const generateRandomItemAsync = async (
-  id: string | number,
-): Promise<WaterfallItem> => {
-  // 模拟网络延迟 500-2000ms
-  const delay = 500 + Math.random() * 1500
-  await new Promise((resolve) => setTimeout(resolve, delay))
-
+// 生成随机项目
+const generateRandomItem = (id: string | number): WaterfallItem => {
   const width = 200 + Math.random() * 100 // 200-300px
   const height = 150 + Math.random() * 200 // 150-350px
   return { id, width, height }
 }
 
-// 生成初始数据（异步版本）
-const generateInitialItems = async (): Promise<WaterfallItem[]> => {
-  const itemIds = Array.from({ length: 20 }, (_, i) => i + 1)
-
-  // 添加所有初始项目到加载状态
-  itemIds.forEach((id) => loadingItems.value.add(id))
-
-  try {
-    // 并发生成所有初始项目
-    const items = await Promise.all(
-      itemIds.map((id) => generateRandomItemAsync(id)),
-    )
-    return items
-  } finally {
-    // 清除所有加载状态
-    itemIds.forEach((id) => loadingItems.value.delete(id))
-  }
+// 生成初始数据
+const generateInitialItems = (): WaterfallItem[] => {
+  return Array.from({ length: 20 }, (_, i) => generateRandomItem(i + 1))
 }
 
 // 获取项目颜色
@@ -222,45 +177,27 @@ const onRowGapChange = (e: any) => {
   })
 }
 
-const addRandomItem = async () => {
+const addRandomItem = () => {
   const newId = Math.max(...items.value.map((item) => Number(item.id))) + 1
+  const newItem = generateRandomItem(newId)
 
-  // 添加到加载状态
-  loadingItems.value.add(newId)
-
-  try {
-    const newItem = await generateRandomItemAsync(newId)
-
-    measureReflowTime(() => {
-      items.value.push(newItem)
-      appendItem(newItem)
-    })
-  } finally {
-    // 移除加载状态
-    loadingItems.value.delete(newId)
-  }
+  measureReflowTime(() => {
+    items.value.push(newItem)
+    appendItem(newItem)
+  })
 }
 
-const insertRandomItem = async () => {
+const insertRandomItem = () => {
   if (items.value.length === 0) return
 
   const insertIndex = Math.floor(Math.random() * items.value.length)
   const newId = Math.max(...items.value.map((item) => Number(item.id))) + 1
+  const newItem = generateRandomItem(newId)
 
-  // 添加到加载状态
-  loadingItems.value.add(newId)
-
-  try {
-    const newItem = await generateRandomItemAsync(newId)
-
-    measureReflowTime(() => {
-      items.value.splice(insertIndex, 0, newItem)
-      insertItem(insertIndex, newItem)
-    })
-  } finally {
-    // 移除加载状态
-    loadingItems.value.delete(newId)
-  }
+  measureReflowTime(() => {
+    items.value.splice(insertIndex, 0, newItem)
+    insertItem(insertIndex, newItem)
+  })
 }
 
 const removeRandomItem = () => {
@@ -275,46 +212,29 @@ const removeRandomItem = () => {
   })
 }
 
-const batchAddItems = async () => {
-  const batchSize = 5
-  const startId = Math.max(...items.value.map((item) => Number(item.id))) + 1
-  const newIds = Array.from({ length: batchSize }, (_, i) => startId + i)
+const batchAddItems = () => {
+  const newItems = Array.from({ length: 5 }, (_, i) => {
+    const newId =
+      Math.max(...items.value.map((item) => Number(item.id))) + i + 1
+    return generateRandomItem(newId)
+  })
 
-  // 添加所有项目到加载状态
-  newIds.forEach((id) => loadingItems.value.add(id))
-
-  try {
-    // 并发生成所有项目
-    const newItems = await Promise.all(
-      newIds.map((id) => generateRandomItemAsync(id)),
+  measureReflowTime(() => {
+    items.value.push(...newItems)
+    batchUpdate(
+      newItems.map((item) => ({
+        type: 'append' as const,
+        data: { item },
+      })),
     )
-
-    measureReflowTime(() => {
-      items.value.push(...newItems)
-      batchUpdate(
-        newItems.map((item) => ({
-          type: 'append' as const,
-          data: { item },
-        })),
-      )
-    })
-  } finally {
-    // 移除所有加载状态
-    newIds.forEach((id) => loadingItems.value.delete(id))
-  }
+  })
 }
 
-const resetItems = async () => {
-  try {
-    const newItems = await generateInitialItems()
-
-    measureReflowTime(() => {
-      items.value = newItems
-      initialize(newItems)
-    })
-  } catch (error) {
-    console.error('重置项目失败:', error)
-  }
+const resetItems = () => {
+  measureReflowTime(() => {
+    items.value = generateInitialItems()
+    initialize(items.value)
+  })
 }
 
 // 获取容器宽度
@@ -331,13 +251,8 @@ onMounted(async () => {
   await nextTick()
   updateContainerWidth()
 
-  try {
-    const initialItems = await generateInitialItems()
-    items.value = initialItems
-    initialize(initialItems)
-  } catch (error) {
-    console.error('初始化失败:', error)
-  }
+  items.value = generateInitialItems()
+  initialize(items.value)
 })
 </script>
 
@@ -395,12 +310,6 @@ onMounted(async () => {
     color: white;
     border: none;
     border-radius: 8rpx;
-
-    &:disabled {
-      background: #ccc;
-      color: #999;
-      cursor: not-allowed;
-    }
   }
 }
 
@@ -413,43 +322,6 @@ onMounted(async () => {
   text {
     flex: 1;
     text-align: center;
-  }
-
-  .loading-text {
-    color: #007aff;
-    font-weight: bold;
-  }
-}
-
-.loading-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20rpx;
-  margin-bottom: 20rpx;
-  background: #f0f8ff;
-  border: 2rpx solid #007aff;
-  border-radius: 12rpx;
-  color: #007aff;
-  font-size: 28rpx;
-
-  .loading-spinner {
-    width: 32rpx;
-    height: 32rpx;
-    border: 4rpx solid #e3f2fd;
-    border-top: 4rpx solid #007aff;
-    border-radius: 50%;
-    margin-right: 15rpx;
-    animation: spin 1s linear infinite;
-  }
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
   }
 }
 
