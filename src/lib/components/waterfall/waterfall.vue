@@ -236,10 +236,66 @@ const addItem = (item: WaterfallItemInfo) => {
  */
 const removeItem = (item: WaterfallItemInfo) => {
   if (items.includes(item)) {
-    const index = items.indexOf(item)
-    items.splice(index, 1)
-    // todo 使用无dom操作，结合算法重排后面的
+    const arrayIndex = items.indexOf(item)
+    items.splice(arrayIndex, 1)
+    // 从待排版队列中也隐藏
+    const pendingIndex = pendingItems.indexOf(item)
+    if (pendingIndex !== -1) {
+      pendingItems.splice(pendingIndex, 1)
+    }
+
+    // 删除后重新计算剩余项目的位置，防止因为index的不一致导致排版错误
+    recalculateItemsAfterRemoval()
   }
+}
+
+/**
+ * 删除项目后重新计算剩余项目位置的优化算法
+ * @param id 伪删除项目的唯一id
+ */
+const recalculateItemsAfterRemoval = () => {
+  if (items.length === 0) {
+    // 如果没有剩余项目，重置容器高度和列高度
+    containerHeight.value = 0
+    initColumns()
+    console.log('没有剩余项目，重置完成')
+    return
+  }
+
+  // 重置列高度状态
+  initColumns()
+
+  // 按照当前的index顺序排序所有剩余项目
+  const sortedItems = [...items].sort((a, b) => {
+    const aIndex = a.index ?? 0
+    const bIndex = b.index ?? 0
+    return aIndex - bIndex
+  })
+
+  // 重新排版所有项目
+  for (let i = 0; i < sortedItems.length; i++) {
+    const item = sortedItems[i]
+    // 获取当前最短的列
+    const minColumn = getMinColumn()
+
+    // 计算新位置
+    const newTop = minColumn.height + props.rowGap
+    const newLeft = (props.columnGap + columnWidth.value) * minColumn.colIndex
+
+    // 更新项目位置
+    item.top = newTop
+    item.left = newLeft
+
+    // 更新对应列的高度
+    columns[minColumn.colIndex].height = newTop + item.height
+  }
+
+  // 更新容器总高度
+  const newContainerHeight = Math.max(...columns.map((col) => col.height), 0)
+  containerHeight.value = newContainerHeight
+
+  // 触发重排完成事件
+  updateLoadStatus()
 }
 
 /**
@@ -385,7 +441,6 @@ const fullReflow = debounce(async () => {
 /**
  * 刷新重排
  */
-
 const refreshReflow = async () => {
   // 重置列
   initColumns()
