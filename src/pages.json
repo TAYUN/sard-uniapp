@@ -465,6 +465,9 @@
           "path": "waterfall/demo/TrueCase"
         },
         {
+          "path": "waterfall/demo/OptimizedTrueCase"
+        },
+        {
           "path": "waterfall/index"
         },
         {
@@ -490,6 +493,15 @@
         },
         {
           "path": "waterfall/demo/TrueOptimizationComparison"
+        },
+        {
+          "path": "waterfall/demo/TextHeightProblem"
+        },
+        {
+          "path": "waterfall/demo/HybridSolution"
+        },
+        {
+          "path": "waterfall/demo/WholeCardMeasurement"
         }
       ]
     }
