@@ -222,11 +222,11 @@ const getMinColumn = () => {
 const addItem = (item: WaterfallItemInfo) => {
   // 直接加入待排版队列
   pendingItems.push(item)
+  items.push(item)
   // 触发首次开始排版 todo 会不会和isactive冲突并发？
   if (loadStatus === 'idle') {
     reflow()
   }
-  items.push(item)
 }
 
 /**
@@ -292,7 +292,6 @@ const recalculateItemsAfterRemoval = () => {
   // 更新容器总高度
   const newContainerHeight = Math.max(...columns.map((col) => col.height), 0)
   containerHeight.value = newContainerHeight
-
   // 触发重排完成事件
   updateLoadStatus()
 }
@@ -332,15 +331,16 @@ const onItemLoad = (item: WaterfallItemInfo) => {
 const processQueue = async () => {
   updateLoadStatus()
   if (pendingItems.length === 0) return
-  // 如果页面不活跃，暂停排版
-  if (!isActive.value) {
-    console.log('页面不活跃，暂停排版')
-    return
-  }
+
+  pendingItems.forEach((item) => {
+    // todo 增量排序没触发高度读取
+    if (!item.loaded) item.beforeReflow()
+  })
   // 处理队列中的项目
   while (pendingItems.length > 0) {
     // 如果页面在排版过程中变为不活跃，停止排版
     if (!isActive.value) {
+      console.log('页面不活跃，暂停排版')
       break
     }
 
@@ -397,17 +397,25 @@ const processQueue = async () => {
   updateLoadStatus()
 }
 
-const resetItemsForReflow = (items: WaterfallItemInfo[]) => {
+const resetItemsForReflow = () => {
   // 设置全局重排状态
   isReflowing.value = true
 
   // 重置项目状态
-  items.forEach((item) => {
-    // item.visible = false // 重置可见性
-    // item.height = 0
-    item.loaded = false
-    item.beforeReflow()
-  })
+  // items.forEach((item) => {
+  //   // item.visible = false // 重置可见性
+  //   // item.height = 0
+  //   item.loaded = false
+  //   item.beforeReflow()
+  // })
+  for (let i = 0; i < items.length; i++) {
+    items[i].visible = false
+    if (!isActive.value) {
+      console.log('resetItemsForReflow - 页面不活跃，暂停排版')
+      continue
+    }
+    items[i].beforeReflow()
+  }
 }
 /**
  * 完整重排函数
@@ -415,9 +423,10 @@ const resetItemsForReflow = (items: WaterfallItemInfo[]) => {
  */
 const fullReflow = debounce(async () => {
   // 如果页面不活跃，暂停排版
-  if (!isActive.value) {
-    return
-  }
+  // if (!isActive.value) {
+  //   console.log('页面不活跃，暂停排版')
+  //   return
+  // }
 
   // 重置所有列的高度
   // resetColumnsHeight()
@@ -428,7 +437,7 @@ const fullReflow = debounce(async () => {
   pendingItems.length = 0
 
   // 重置所有项目状态
-  resetItemsForReflow(items)
+  resetItemsForReflow()
 
   // 将所有项目加入待排版队列
   pendingItems.push(...items)
@@ -479,6 +488,7 @@ watch(
   (newActive, oldActive) => {
     if (newActive && !oldActive) {
       // 页面从不活跃变为活跃，继续处理待排版队列
+
       setTimeout(() => {
         // 页面激活后继续处理待排版队列
         reflow()
@@ -497,6 +507,7 @@ onShow(() => {
 
 onHide(() => {
   isActive.value = false
+  console.log('页面隐藏')
 })
 
 // ==================== 上下文提供 ====================
