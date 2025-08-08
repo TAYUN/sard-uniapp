@@ -332,10 +332,10 @@ const processQueue = async () => {
   updateLoadStatus()
   if (pendingItems.length === 0) return
 
-  pendingItems.forEach((item) => {
-    // todo 增量排序没触发高度读取
-    if (!item.loaded) item.beforeReflow()
-  })
+  // pendingItems.forEach((item) => {
+  //   // todo 增量排序没触发高度读取
+  //   if (!item.loaded) item.beforeReflow()
+  // })
   // 处理队列中的项目
   while (pendingItems.length > 0) {
     // 如果页面在排版过程中变为不活跃，停止排版
