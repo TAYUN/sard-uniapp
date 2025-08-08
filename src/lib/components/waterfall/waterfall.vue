@@ -369,7 +369,7 @@ const processQueue = async () => {
   updateLoadStatus()
 }
 
-const resetItemsForReflow = async (items: WaterfallItemInfo[]) => {
+const resetItemsForReflow = (items: WaterfallItemInfo[]) => {
   // 设置全局重排状态
   isReflowing.value = true
 
@@ -400,7 +400,7 @@ const fullReflow = debounce(async () => {
   pendingItems.length = 0
 
   // 重置所有项目状态
-  await resetItemsForReflow(items)
+  resetItemsForReflow(items)
 
   // 将所有项目加入待排版队列
   pendingItems.push(...items)
