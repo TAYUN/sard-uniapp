@@ -478,6 +478,9 @@
         },
         {
           "path": "waterfall/demo/ReflowDemo2"
+        },
+        {
+          "path": "waterfall/demo/WaterfallDeleteDemo"
         }
       ]
     }

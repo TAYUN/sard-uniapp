@@ -44,6 +44,10 @@ const demoList: DemoItem[] = [
   { title: '大图', path: '/pages/components/waterfall/demo/BigImage' },
   { title: '重排', path: '/pages/components/waterfall/demo/ReflowDemo' },
   { title: '重排2', path: '/pages/components/waterfall/demo/ReflowDemo2' },
+  {
+    title: '删除',
+    path: '/pages/components/waterfall/demo/WaterfallDeleteDemo',
+  },
 ]
 
 const navigateToDemo = (path: string) => {
