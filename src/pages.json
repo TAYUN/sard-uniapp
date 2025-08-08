@@ -472,6 +472,12 @@
         },
         {
           "path": "waterfall/demo/SmoothReflow"
+        },
+        {
+          "path": "waterfall/demo/ReflowDemo"
+        },
+        {
+          "path": "waterfall/demo/ReflowDemo2"
         }
       ]
     }
