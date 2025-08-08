@@ -57,6 +57,13 @@ export function useWaterfallReflow(options: UseWaterfallReflowOptions) {
   }
 
   /**
+   * 生成快照
+   */
+  const initSnapshot = (items: WaterfallItem[]) => {
+    manager.initSnapshot(items)
+    isInitialized.value = true
+  }
+  /**
    * 初始化瀑布流（第一次排版完成后调用）
    */
   const initialize = (items: WaterfallItem[]) => {
@@ -169,6 +176,7 @@ export function useWaterfallReflow(options: UseWaterfallReflowOptions) {
     isInitialized: readonly(isInitialized),
 
     // 方法
+    initSnapshot,
     initialize,
     reflow,
     insertItem,
