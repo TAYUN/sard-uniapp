@@ -111,7 +111,8 @@ const onRefresh = () => {
         list.value = res.list
 
         loadMoreStatus.value = 'loading'
-
+        waterfallRef.value?.refreshReflow()
+        // debugger
         waterfallRef.value?.onLoad(() => {
           setTimeout(() => {
             loadMoreStatus.value =
@@ -137,7 +138,6 @@ const loadMoreFetch = (page: number) => {
   fetchApi(page)
     .then((res) => {
       list.value = [...list.value, ...res.list]
-
       waterfallRef.value?.onLoad(() => {
         setTimeout(() => {
           loadMoreStatus.value =

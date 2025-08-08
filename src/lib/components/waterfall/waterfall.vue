@@ -242,6 +242,32 @@ const removeItem = (item: WaterfallItemInfo) => {
   }
 }
 
+/**
+ * 项目加载完成回调
+ * 当子组件的内容（如图片）加载完成或失败时调用
+ */
+const onItemLoad = (item: WaterfallItemInfo) => {
+  void item.height
+  // // 如果加载失败且允许重试
+  // if (!item.loadSuccess && props.maxRetries > 0) {
+  //   // 初始化重试计数
+  //   if (item.retryCount === undefined) {
+  //     item.retryCount = 0
+  //   }
+  //   // 如果未超过最大重试次数，自动重试
+  //   if (item.retryCount < props.maxRetries) {
+  //     item.retryCount++
+  //     item.loaded = false // 重置加载状态
+  //     // 延迟重试
+  //     setTimeout(() => {
+  //       // 触发重试逻辑
+  //       // emit('retry', { item, retryCount: item.retryCount })
+  //     }, props.retryDelay)
+  //     return
+  //   }
+  // }
+}
+
 // ==================== 瀑布流布局算法 ====================
 
 /**
@@ -259,12 +285,12 @@ const processQueue = async () => {
 
   // let processedCount = 0 // 已处理的项目数量
 
-  // 如果是完整重排，先隐藏所有待处理的项目
-  if (pendingItems.length > 0) {
-    pendingItems.forEach((item) => {
-      item.visible = false
-    })
-  }
+  // 如果是完整重排，先隐藏所有待处理的项目 注释掉这里切换列数会有动画
+  // if (pendingItems.length > 0) {
+  //   pendingItems.forEach((item) => {
+  //     item.visible = false
+  //   })
+  // }
 
   // 处理队列中的项目
   while (pendingItems.length > 0) {
@@ -349,8 +375,8 @@ const resetItemsForReflow = async (items: WaterfallItemInfo[]) => {
 
   // 重置项目状态
   items.forEach((item) => {
-    item.visible = false // 重置可见性
-    item.height = 0
+    // item.visible = false // 重置可见性
+    // item.height = 0
     item.loaded = false
     item.beforeReflow()
   })
@@ -384,37 +410,25 @@ const fullReflow = debounce(async () => {
 }, 16)
 
 /**
+ * 刷新重排
+ */
+
+const refreshReflow = async () => {
+  // 重置列
+  initColumns()
+
+  // 重新构建待排版队列
+  pendingItems.length = 0
+  // 如果是刷新数据，items要重置
+  items.length = 0
+}
+
+/**
  * 增量重排函数
  * 仅处理当前待排版队列中的项目
  */
 const reflow = () => {
   return processQueue()
-}
-
-/**
- * 项目加载完成回调
- * 当子组件的内容（如图片）加载完成或失败时调用
- */
-const onItemLoad = (item: WaterfallItemInfo) => {
-  void item.height
-  // // 如果加载失败且允许重试
-  // if (!item.loadSuccess && props.maxRetries > 0) {
-  //   // 初始化重试计数
-  //   if (item.retryCount === undefined) {
-  //     item.retryCount = 0
-  //   }
-  //   // 如果未超过最大重试次数，自动重试
-  //   if (item.retryCount < props.maxRetries) {
-  //     item.retryCount++
-  //     item.loaded = false // 重置加载状态
-  //     // 延迟重试
-  //     setTimeout(() => {
-  //       // 触发重试逻辑
-  //       // emit('retry', { item, retryCount: item.retryCount })
-  //     }, props.retryDelay)
-  //     return
-  //   }
-  // }
 }
 
 // ==================== 响应式监听 ====================
@@ -484,6 +498,7 @@ provide(
 defineExpose<WaterfallExpose>({
   reflow, // 增量重排（处理待排版队列）
   fullReflow, // 完整重排（重置所有状态）
+  refreshReflow, // 刷新重排（重置所有状态，包括数据）
   onLoad, // 注册加载完成回调
 })
 
