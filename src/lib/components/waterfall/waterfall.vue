@@ -282,16 +282,6 @@ const processQueue = async () => {
     console.log('页面不活跃，暂停排版')
     return
   }
-
-  // let processedCount = 0 // 已处理的项目数量
-
-  // 如果是完整重排，先隐藏所有待处理的项目 注释掉这里切换列数会有动画
-  // if (pendingItems.length > 0) {
-  //   pendingItems.forEach((item) => {
-  //     item.visible = false
-  //   })
-  // }
-
   // 处理队列中的项目
   while (pendingItems.length > 0) {
     // 如果页面在排版过程中变为不活跃，停止排版
@@ -319,18 +309,6 @@ const processQueue = async () => {
           { immediate: true }, // 立即检查一次，防止竞态条件
         )
       })
-      // 设置超时，避免永久等待
-      // 子组件已经设置超时，这里就不需要了
-      // setTimeout(() => {
-      //   unwatch()
-      //   console.warn(`${item.index}项目加载超时，不要了，跳过`)
-      //   resolve(false)
-      // }, 100)
-      // if (!res) {
-      //   // 从队列中移除已排版的项目
-      //   pendingItems.shift()
-      //   continue
-      // }
     }
 
     // 【修复】每次循环都重新获取最短列，避免引用失效问题
@@ -348,13 +326,8 @@ const processQueue = async () => {
     // 直接设置可见状态
     item.visible = true
 
-    // processedCount++
-
     // 从队列中移除已排版的项目
     pendingItems.shift()
-
-    // 【可选】添加微任务延迟，确保响应式更新生效
-    // await nextTick()
   }
 
   // 计算容器总高度（取最高列的高度）

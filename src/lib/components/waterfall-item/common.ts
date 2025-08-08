@@ -18,6 +18,7 @@ export interface WaterfallItemInfo {
   loaded: boolean // 是否完成加载过程（成功或失败）
   loadSuccess: boolean // 是否加载成功
   visible: boolean // 是否可见
+  width: number // 项目宽度
   height: number // 项目高度
   top: number // 垂直位置
   left: number // 水平位置
