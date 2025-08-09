@@ -241,7 +241,7 @@ defineExpose<WaterfallItemExpose>({})
 @import './index.scss';
 .item {
   position: absolute;
-  inset: 0;
+  // inset: 0;
   z-index: 9999;
 }
 </style>
