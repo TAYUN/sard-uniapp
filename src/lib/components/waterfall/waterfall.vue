@@ -332,25 +332,11 @@ const processQueue = async () => {
   updateLoadStatus()
   if (pendingItems.length === 0) return
 
-  // pendingItems.forEach((item) => {
-  //   // todo 增量排序没触发高度读取
-  //   if (!item.loaded) item.beforeReflow()
-  // })
   // 处理队列中的项目
   while (pendingItems.length > 0) {
-    // 如果页面在排版过程中变为不活跃，停止排版
-    if (!isActive.value) {
-      console.log('页面不活跃，暂停排版')
-      break
-    }
-
     const item = pendingItems[0] // 取队列第一个项目
-
-    // 检查项目是否已加载
-    // 没加载完，就等待加载完成 因为不管子项目加载成功还是加载失败，都会调设置loaded为true
     // 检查项目是否已加载
     if (!item.loaded) {
-      // 创建一个 Promise 等待加载完成
       await new Promise<void>((resolve) => {
         // 创建一个监听器
         const unwatch = watch(
@@ -365,15 +351,19 @@ const processQueue = async () => {
         )
       })
     }
-
-    // 【修复】每次循环都重新获取最短列，避免引用失效问题
+    if (!isActive.value) {
+      console.log('页面不活跃，暂停排版 2')
+      pendingItems.forEach((item) => {
+        item.loaded = false
+      })
+      return
+    }
     const currentMinColumn = getMinColumn()
     // 计算项目位置
     item.top = currentMinColumn.height + props.rowGap
     item.left =
       (props.columnGap + columnWidth.value) * currentMinColumn.colIndex
 
-    // 【修复】直接使用获取到的列索引更新高度，确保更新的是正确的列
     const targetColumnIndex = currentMinColumn.colIndex
     const newHeight = item.top + item.height
     columns[targetColumnIndex].height = newHeight
@@ -382,11 +372,11 @@ const processQueue = async () => {
     item.visible = true
 
     // 从队列中移除已排版的项目
+    containerHeight.value = Math.max(...columns.map((col) => col.height), 0)
     pendingItems.shift()
   }
 
   // 计算容器总高度（取最高列的高度）
-  containerHeight.value = Math.max(...columns.map((col) => col.height), 0)
 
   // 所有项目处理完成后，清除全局重排状态
   if (pendingItems.length === 0) {
@@ -402,34 +392,16 @@ const resetItemsForReflow = () => {
   isReflowing.value = true
 
   // 重置项目状态
-  // items.forEach((item) => {
-  //   // item.visible = false // 重置可见性
-  //   // item.height = 0
-  //   item.loaded = false
-  //   item.beforeReflow()
-  // })
-  for (let i = 0; i < items.length; i++) {
-    items[i].visible = false
-    if (!isActive.value) {
-      console.log('resetItemsForReflow - 页面不活跃，暂停排版')
-      continue
-    }
-    items[i].beforeReflow()
-  }
+  items.forEach((item) => {
+    item.loaded = false
+    item.beforeReflow()
+  })
 }
 /**
  * 完整重排函数
  * 重置所有状态，重新排版所有项目
  */
 const fullReflow = debounce(async () => {
-  // 如果页面不活跃，暂停排版
-  // if (!isActive.value) {
-  //   console.log('页面不活跃，暂停排版')
-  //   return
-  // }
-
-  // 重置所有列的高度
-  // resetColumnsHeight()
   // 重置列
   initColumns()
 
@@ -486,11 +458,12 @@ watch([() => props.columns, () => props.columnGap, () => props.rowGap], () => {
 watch(
   () => isActive.value,
   (newActive, oldActive) => {
-    if (newActive && !oldActive) {
-      // 页面从不活跃变为活跃，继续处理待排版队列
-
+    if (newActive && !oldActive && pendingItems.length > 0) {
+      console.log('页面重新激活，继续处理待排版项目', pendingItems)
+      pendingItems.forEach((item) => {
+        item.beforeReflow()
+      })
       setTimeout(() => {
-        // 页面激活后继续处理待排版队列
         reflow()
       }, 100) // 延迟执行，确保页面完全激活
     }

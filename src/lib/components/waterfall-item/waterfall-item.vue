@@ -2,6 +2,7 @@
   <!-- 瀑布流项目容器：绝对定位，通过 transform 控制位置 -->
   <view :class="waterfallItemClass" :style="waterfallItemStyle">
     <!-- 向子内容传递加载回调和列宽信息 -->
+    <text class="item">{{ item.height.toFixed(2) }}</text>
     <slot :on-load="onLoad" :column-width="context.columnWidth"></slot>
   </view>
 </template>
@@ -119,20 +120,28 @@ const item = shallowReactive<WaterfallItemInfo>({
  * 更新项目高度
  * 通过 DOM 查询获取项目的实际渲染高度
  */
+
 const updateHeight = async () => {
   try {
     await nextTick() // 很重要不然会导致获取高度错误
+    // await new Promise((resolve) => setTimeout(resolve, 100))
     // 查询 DOM 元素的边界信息，获取实际高度
     const rect = await getBoundingClientRect(`.${itemId}`, instance)
-    item.height = rect.height === 0 ? 1 : rect.height
-    if (rect.height === 0 || !rect.height) {
+    if (!rect.height || rect.height === 0) {
       item.height = 240 // todo 设置默认高度
+      item.loaded = false
     } else {
       item.height = rect.height
+      item.loaded = true
     }
-    item.loaded = true
-  } catch {
+    // console.log('rect.height', item.index, '---', rect.height)
+  } catch (error) {
     // 查询失败时静默处理，避免报错
+    console.error(error)
+    uni.showModal({
+      content: `error高度获取失败，${item.height}`,
+      showCancel: false,
+    })
     void 0
   }
 }
@@ -230,4 +239,9 @@ defineExpose<WaterfallItemExpose>({})
 
 <style lang="scss">
 @import './index.scss';
+.item {
+  position: absolute;
+  inset: 0;
+  z-index: 9999;
+}
 </style>
