@@ -323,7 +323,6 @@ const onItemLoad = (item: WaterfallItemInfo) => {
 }
 
 // ==================== 瀑布流布局算法 ====================
-
 /**
  * 处理排版队列
  * 从 pendingItems 队列中取出项目进行排版
@@ -337,6 +336,7 @@ const processQueue = async () => {
     const item = pendingItems[0] // 取队列第一个项目
     // 检查项目是否已加载
     if (!item.loaded) {
+      // todo 如果没有外面的if，下面这里unwatch会报错
       await new Promise<void>((resolve) => {
         // 创建一个监听器
         const unwatch = watch(
@@ -347,23 +347,24 @@ const processQueue = async () => {
               resolve() // 解决 Promise
             }
           },
-          { immediate: true }, // 立即检查一次，防止竞态条件
+          { immediate: true },
         )
       })
     }
-    if (!isActive.value) {
-      console.log('页面不活跃，暂停排版 2')
-      pendingItems.forEach((item) => {
-        item.loaded = false
-      })
+    if (!isActive.value || item.height === 240.0000000000011) {
+      // 下面这个设置item.loaded = false 可以不要，因为下次onShow子组件的刷新方法，会设置loaded = false
+      // pendingItems.forEach((item) => {
+      //   item.loaded = false
+      // })
+      console.log('页面不活跃，暂停排版 2', pendingItems)
       return
     }
     const currentMinColumn = getMinColumn()
+
     // 计算项目位置
     item.top = currentMinColumn.height + props.rowGap
     item.left =
       (props.columnGap + columnWidth.value) * currentMinColumn.colIndex
-
     const targetColumnIndex = currentMinColumn.colIndex
     const newHeight = item.top + item.height
     columns[targetColumnIndex].height = newHeight
@@ -459,13 +460,17 @@ watch(
   () => isActive.value,
   (newActive, oldActive) => {
     if (newActive && !oldActive && pendingItems.length > 0) {
-      console.log('页面重新激活，继续处理待排版项目', pendingItems)
-      pendingItems.forEach((item) => {
-        item.beforeReflow()
-      })
-      setTimeout(() => {
-        reflow()
-      }, 100) // 延迟执行，确保页面完全激活
+      console.log('页面重新激活，继续处理待排版项目', [...pendingItems])
+      // 必须要用 nextTick
+      nextTick(() => {
+        pendingItems.forEach((item) => {
+          item.refreshImage()
+        })
+        setTimeout(() => {
+          // 这里很重要，必要要包裹在setTimeout中
+          reflow()
+        }, 0)
+      }) // 延迟执行，确保页面完全激活
     }
     // 页面变为不活跃时不需要特殊处理，processQueue 会自动停止
   },

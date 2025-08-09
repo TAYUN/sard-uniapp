@@ -3,7 +3,11 @@
   <view :class="waterfallItemClass" :style="waterfallItemStyle">
     <!-- 向子内容传递加载回调和列宽信息 -->
     <text class="item">{{ item.height.toFixed(2) }}</text>
-    <slot :on-load="onLoad" :column-width="context.columnWidth"></slot>
+    <slot
+      :on-load="onLoad"
+      :column-width="context.columnWidth"
+      :key="itemId"
+    ></slot>
   </view>
 </template>
 
@@ -75,7 +79,8 @@ const bem = createBem('waterfall-item')
  * 包含添加/移除项目、加载回调、列宽等信息
  */
 const context = inject(waterfallContextKey)!
-
+// 生成唯一的项目ID，用于DOM查询
+let itemId = ref(uniqid())
 /**
  * 加载完成回调
  * 当项目内容（如图片）加载完成或失败时调用
@@ -84,9 +89,7 @@ const context = inject(waterfallContextKey)!
 const onLoad = async (event?: any) => {
   // 检查是否加载成功
   item.loadSuccess = event?.type === 'load'
-
   await item.beforeReflow()
-
   context.onItemLoad(item) // 传递项目信息给父组件
 }
 
@@ -94,8 +97,6 @@ const onLoad = async (event?: any) => {
 
 // 获取当前组件实例，用于DOM操作
 const instance = getCurrentInstance()
-// 生成唯一的项目ID，用于DOM查询
-const itemId = uniqid()
 
 /**
  * 项目信息对象（响应式）todo shallowReactive
@@ -114,6 +115,13 @@ const item = shallowReactive<WaterfallItemInfo>({
     // 重排前的预处理：更新高度信息
     await updateHeight()
   },
+  refreshImage: async () => {
+    // 重新加载图片
+    item.loadSuccess = false
+    item.loaded = false
+    itemId.value = uniqid()
+    // await item.beforeReflow()
+  },
 })
 
 /**
@@ -126,22 +134,19 @@ const updateHeight = async () => {
     await nextTick() // 很重要不然会导致获取高度错误
     // await new Promise((resolve) => setTimeout(resolve, 100))
     // 查询 DOM 元素的边界信息，获取实际高度
-    const rect = await getBoundingClientRect(`.${itemId}`, instance)
-    if (!rect.height || rect.height === 0) {
-      item.height = 240 // todo 设置默认高度
-      item.loaded = false
+    const rect = await getBoundingClientRect(`.${itemId.value}`, instance)
+    if (!rect?.height || rect?.height === 0) {
+      item.height = 240.0000000000011 // 设置特殊高度与默认240高度区别开，避免误伤正常240的情况
+      item.loaded = true
     } else {
       item.height = rect.height
       item.loaded = true
+      console.log('rect.height', rect.height)
     }
-    // console.log('rect.height', item.index, '---', rect.height)
   } catch (error) {
     // 查询失败时静默处理，避免报错
-    console.error(error)
-    uni.showModal({
-      content: `error高度获取失败，${item.height}`,
-      showCancel: false,
-    })
+    console.error(error, `error高度获取失败，${item.height}`)
+
     void 0
   }
 }
@@ -192,7 +197,7 @@ const waterfallItemClass = computed(() => {
     bem.b(), // 基础类名：sar-waterfall-item
     bem.m('show', item.visible || context.isReflowing), // 显示状态：重排时也保持可见
     bem.m('reflowing', context.isReflowing), // 重排状态类名
-    itemId, // 唯一ID，用于DOM查询
+    itemId.value, // 唯一ID，用于DOM查询
     props.rootClass, // 用户自定义类名
   )
 })
@@ -243,5 +248,6 @@ defineExpose<WaterfallItemExpose>({})
   position: absolute;
   // inset: 0;
   z-index: 9999;
+  color: red;
 }
 </style>

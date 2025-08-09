@@ -7,7 +7,7 @@ export interface WaterfallItemProps {
 }
 
 export interface WaterfallItemSlots {
-  default?(props: { onLoad: () => void; columnWidth: number }): any
+  default?(props: { onLoad: () => void; columnWidth: number; key: string }): any
 }
 
 export interface WaterfallItemEmits {}
@@ -25,4 +25,5 @@ export interface WaterfallItemInfo {
   index?: number // 项目索引
   retryCount?: number // 重试次数
   beforeReflow: () => Promise<void> // 重排前的预处理
+  refreshImage: () => Promise<void> // 重排前的预处理
 }
