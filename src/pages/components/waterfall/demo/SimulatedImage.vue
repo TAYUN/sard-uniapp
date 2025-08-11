@@ -27,6 +27,7 @@ const emit = defineEmits<{
         width: number
         height: number
       }
+      type: 'load' | 'error'
     },
   ): void
 }>()
@@ -50,6 +51,7 @@ const { start } = useTimeout(
         width: props.meta.width,
         height: props.meta.height,
       },
+      type: Math.random() > 0.7 ? 'load' : 'error',
     })
   },
   random(150, 1500),

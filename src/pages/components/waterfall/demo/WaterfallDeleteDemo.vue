@@ -47,13 +47,49 @@
         :index="item.index"
         class="demo-item"
       >
-        <template #default="{ onLoad }">
-          <SimulatedImage :meta="item.img" @load="onLoad" />
+        <template #default="{ onLoad, errorInfo }">
+          <!-- 第一层：原始内容 -->
+          <SimulatedImage
+            v-if="errorInfo.errorType === 'none'"
+            :meta="item.img"
+            @load="onLoad"
+          />
+
+          <!-- 第二层：占位图片 -->
+          <view
+            v-else-if="errorInfo.hasError && !errorInfo.showFinalFallback"
+            class="fallback-container"
+          >
+            <image
+              :src="errorInfo.fallbackImageSrc"
+              mode="aspectFill"
+              class="fallback-image"
+              @load="errorInfo.onFallbackLoad"
+              @error="errorInfo.onFallbackError"
+            />
+          </view>
+
+          <!-- 第三层：最终兜底方案（占位图片失败或超时） -->
+          <view v-else class="final-fallback">
+            <view class="fallback-content">
+              <text class="fallback-text">
+                {{ errorInfo.errorMessage || '图片加载失败' }}
+              </text>
+              <text class="fallback-type">
+                {{ getErrorTypeText(errorInfo.errorType) }}
+              </text>
+            </view>
+          </view>
+
+          <!-- 其他内容始终显示 -->
           <view class="demo-content p-16">
             <view class="demo-title mb-8">{{ item.title }}</view>
             <view class="demo-meta">
               <text class="demo-id">ID: {{ item.id }}</text>
               <text class="demo-index">Index: {{ item.index }}</text>
+              <text class="demo-error" v-if="errorInfo.errorType !== 'none'">
+                错误: {{ errorInfo.errorType }}
+              </text>
             </view>
             <sar-button
               size="mini"
@@ -219,6 +255,20 @@ const onLoad = () => {
   toast.hide()
 }
 
+// 错误类型文本转换
+const getErrorTypeText = (errorType: string) => {
+  switch (errorType) {
+    case 'original-failed':
+      return '原始内容加载失败'
+    case 'fallback-failed':
+      return '占位图片也加载失败'
+    case 'timeout':
+      return '加载超时'
+    default:
+      return ''
+  }
+}
+
 // 初始化数据
 const initData = () => {
   const initialData: DemoItem[] = Array(6)
@@ -316,6 +366,57 @@ onMounted(async () => {
   color: var(--sar-text-color-secondary);
   font-weight: 500;
   word-break: break-all;
+}
+
+// 错误处理相关样式
+.fallback-container {
+  width: 100%;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f5f5f5;
+  border-radius: 8rpx;
+}
+
+.fallback-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8rpx;
+}
+
+.final-fallback {
+  width: 100%;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f5f5f5;
+  border: 1px dashed #ddd;
+  border-radius: 8rpx;
+}
+
+.fallback-content {
+  text-align: center;
+}
+
+.fallback-text {
+  font-size: 28rpx;
+  color: #999;
+  display: block;
+  margin-bottom: 8rpx;
+}
+
+.fallback-type {
+  font-size: 24rpx;
+  color: #ccc;
+  display: block;
+}
+
+.demo-error {
+  color: #ff4757;
+  font-size: 22rpx;
 }
 
 // 暗黑模式适配
