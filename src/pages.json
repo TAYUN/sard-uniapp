@@ -481,6 +481,12 @@
         },
         {
           "path": "waterfall/demo/WaterfallDeleteDemo"
+        },
+        {
+          "path": "waterfall/demo/WaterfallRealFailureDemo"
+        },
+        {
+          "path": "waterfall/demo/WaterfallFallbackFailDemo"
         }
       ]
     }

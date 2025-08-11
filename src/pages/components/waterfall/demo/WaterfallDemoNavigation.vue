@@ -48,6 +48,14 @@ const demoList: DemoItem[] = [
     title: '删除',
     path: '/pages/components/waterfall/demo/WaterfallDeleteDemo',
   },
+  {
+    title: '真实失败',
+    path: '/pages/components/waterfall/demo/WaterfallRealFailureDemo',
+  },
+  {
+    title: '占位失败',
+    path: '/pages/components/waterfall/demo/WaterfallFallbackFailDemo',
+  },
 ]
 
 const navigateToDemo = (path: string) => {
