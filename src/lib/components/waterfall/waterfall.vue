@@ -331,32 +331,51 @@ const processQueue = async () => {
   updateLoadStatus()
   if (pendingItems.length === 0) return
 
+  // 用一个局部 Set 收集本轮循环里创建的 watch
+  // 1. 定义一个普通 Set 存放控制柄
+  const liveTasks = new Set<{
+    resolve: () => void
+    reject: () => void
+    stop: () => void
+  }>()
+
   // 处理队列中的项目
   while (pendingItems.length > 0) {
     const item = pendingItems[0] // 取队列第一个项目
     // 检查项目是否已加载
     if (!item.loaded) {
       // todo 如果没有外面的if，下面这里unwatch会报错
-      await new Promise<void>((resolve) => {
+      await new Promise<void>((resolve, reject) => {
         // 创建一个监听器
-        const unwatch = watch(
+        const stop = watch(
           () => item.loaded,
           // todo 这里立即执行是false 怎么办
           (newLoaded) => {
             if (newLoaded) {
-              unwatch() // 停止监听
+              stop() // 停止监听
               resolve() // 解决 Promise
             }
           },
           { immediate: true },
         )
+        // 把 resolve / reject / stop 一起存起来
+        const handle = { resolve, reject, stop }
+        liveTasks.add(handle)
       })
     }
+
     if (!isActive.value || item.height === 240.0000000000011) {
       // 下面这个设置item.loaded = false 可以不要，因为下次onShow子组件的刷新方法，会设置loaded = false
       // pendingItems.forEach((item) => {
       //   item.loaded = false
       // })
+      //
+      // 页面不可见，统一清理 watch 和 拒绝 promise 兜底清理：全部 reject + stop
+      liveTasks.forEach(({ reject, stop }) => {
+        reject()
+        stop()
+      })
+      liveTasks.clear()
       console.log('页面不活跃，暂停排版 2', pendingItems)
       return
     }
@@ -384,6 +403,13 @@ const processQueue = async () => {
   if (pendingItems.length === 0) {
     isReflowing.value = false
   }
+
+  // 全部排完后，兜底清理残余 watch
+  liveTasks.forEach(({ reject, stop }) => {
+    reject()
+    stop()
+  })
+  liveTasks.clear()
 
   // 更新加载状态
   updateLoadStatus()
