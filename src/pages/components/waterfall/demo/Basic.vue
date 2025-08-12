@@ -47,6 +47,7 @@ import { nextTick, onMounted, ref } from 'vue'
 import SimulatedImage from './SimulatedImage.vue'
 import WaterfallDemoNavigation from './WaterfallDemoNavigation.vue'
 import { text } from '../../read-more/demo/data'
+import { onReachBottom } from '@dcloudio/uni-app'
 
 interface ListItem {
   title: string
@@ -62,13 +63,13 @@ const getData = () => {
   return new Promise<ListItem[]>((resolve) => {
     const data = Array(20)
       .fill(0)
-      .map(() => {
+      .map((_, index) => {
         const min = 20
         const max = 50
         const startIndex = random(0, text.length - max)
         const length = random(min, max)
         return {
-          title: text.slice(startIndex, startIndex + length),
+          title: index + '--' + text.slice(startIndex, startIndex + length),
           img: {
             width: random(100, 500),
             height: random(100, 500),
@@ -100,6 +101,10 @@ onMounted(async () => {
   nextTick(() => {
     toast.loading('加载中')
   })
+  list.value.push(...(await getData()))
+})
+
+onReachBottom(async () => {
   list.value.push(...(await getData()))
 })
 </script>

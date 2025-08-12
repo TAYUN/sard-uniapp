@@ -83,8 +83,8 @@ const fetchApi = async (page: number) => {
 
   return {
     page,
-    total: 3,
-    list: page > 3 ? [] : shuffle(getList()),
+    total: 10,
+    list: page > 10 ? [] : shuffle(getList()),
   }
 }
 
@@ -175,4 +175,8 @@ onMounted(() => {
 const onDelete = (item: ListItem) => {
   list.value.splice(list.value.indexOf(item), 1)
 }
+
+onReachBottom(async () => {
+  loadMoreFetch(++currentPage.value)
+})
 </script>

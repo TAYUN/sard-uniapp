@@ -26,6 +26,7 @@ import { onMounted, ref } from 'vue'
 import SimulatedImage from './SimulatedImage.vue'
 import WaterfallDemoNavigation from './WaterfallDemoNavigation.vue'
 import { text } from '../../read-more/demo/data'
+import { onReachBottom } from '@dcloudio/uni-app'
 
 interface ListItem {
   title: string
@@ -59,6 +60,10 @@ const getData = () => {
 }
 
 onMounted(async () => {
+  list.value.push(...(await getData()))
+})
+
+onReachBottom(async () => {
   list.value.push(...(await getData()))
 })
 </script>
