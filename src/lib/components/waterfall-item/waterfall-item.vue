@@ -117,12 +117,11 @@ let overtime = false
 // 超时处理机制
 const { start: startTimeout } = useTimeout(async () => {
   if (!item.loaded && !overtime) {
-    console.log('加载超时，启用兜底方案')
+    // console.log('加载超时，启用兜底方案')
     overtime = true
     item.errorType = 'timeout'
     item.errorMessage = '加载超时'
     item.showFinalFallback = true
-    console.log('item', item)
     await item.beforeReflow()
     context.onItemLoad(item)
   }
@@ -156,11 +155,11 @@ const onLoad = async (event?: any) => {
     await item.beforeReflow()
   } else if (!item.loadSuccess && retryCount > 0) {
     // 还可以重试
-    console.log('重试', retryCount)
-    await item.refreshImage()
+    // console.log('重试', retryCount)
+    await item.refreshImage(false)
   } else {
     // 第一层失败：原始内容加载失败，进入第二层（占位图片）
-    console.log('原始内容加载失败，显示占位图片')
+    // console.log('原始内容加载失败，显示占位图片')
     item.errorType = 'original-failed'
     item.errorMessage = '原始内容加载失败'
     item.showFallback = true
@@ -175,7 +174,7 @@ const onLoad = async (event?: any) => {
  * 第二层：占位图片加载成功
  */
 const onFallbackLoad = async () => {
-  console.log('占位图片加载成功')
+  // console.log('占位图片加载成功')
   // 占位图片加载成功，保持当前状态即可
   // errorType 保持为 'original-failed'，因为原始内容确实失败了
 
@@ -190,7 +189,7 @@ const onFallbackLoad = async () => {
  * 第二层失败：占位图片也加载失败，进入第三层（文字兜底）
  */
 const onFallbackError = async () => {
-  console.log('占位图片也加载失败，显示最终兜底方案')
+  // console.log('占位图片也加载失败，显示最终兜底方案')
   if (overtime) return // 已超时，忽略后续加载事件
 
   item.errorType = 'fallback-failed'
@@ -229,7 +228,7 @@ const item = shallowReactive<WaterfallItemInfo>({
     // 重排前的预处理：更新高度信息
     await updateHeight()
   },
-  refreshImage: async () => {
+  refreshImage: async (isReset = true) => {
     // 重新加载图片，重置所有错误状态
     item.loaded = false
     item.loadSuccess = false
@@ -239,7 +238,7 @@ const item = shallowReactive<WaterfallItemInfo>({
     item.showFinalFallback = false
     itemId.value = uniqid()
     // 重新启动超时计时器 todo 这里应该打开吗？需要使用参数控制是否重新启动定时器吗？
-    if (overtime) {
+    if (isReset) {
       overtime = false
       startTimeout()
     }
