@@ -104,7 +104,7 @@ const bem = createBem('waterfall-item')
 let retryCount = 2
 
 // 最大等待时间（包括错误重试和占位图片加载失败的时间）也就是这个item要在maxWait毫秒内处理完成所有情况，否则跳过
-const maxWait = 3000
+const maxWait = 2000
 
 // 占位图片地址 - 可以修改为失败的地址来测试最终兜底方案
 const fallbackImageSrc =
