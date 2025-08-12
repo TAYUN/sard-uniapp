@@ -341,6 +341,7 @@ const processQueue = async () => {
         // 创建一个监听器
         const unwatch = watch(
           () => item.loaded,
+          // todo 这里立即执行是false 怎么办
           (newLoaded) => {
             if (newLoaded) {
               unwatch() // 停止监听
