@@ -8,6 +8,19 @@
             :meta="item.img"
             @load="onLoad"
           />
+          <!-- 第二层：占位图片 -->
+          <view
+            v-else-if="errorInfo.hasError && !errorInfo.showFinalFallback"
+            class="fallback-container"
+          >
+            <image
+              :src="errorInfo.fallbackImageSrc"
+              mode="aspectFill"
+              class="fallback-image"
+              @load="errorInfo.onFallbackLoad"
+              @error="errorInfo.onFallbackError"
+            />
+          </view>
           <view v-else class="final-fallback">
             <view class="fallback-content">
               <text class="fallback-text">
@@ -92,6 +105,24 @@ onMounted(async () => {
 </script>
 
 <style lang="scss" scoped>
+// 错误处理相关样式
+.fallback-container {
+  width: 100%;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f5f5f5;
+  border-radius: 8rpx;
+}
+
+.fallback-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8rpx;
+}
+
 .final-fallback {
   width: 100%;
   height: 150px;

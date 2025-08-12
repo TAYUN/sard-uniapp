@@ -107,7 +107,10 @@ let retryCount = 2
 const maxWait = 3000
 
 // 占位图片地址 - 可以修改为失败的地址来测试最终兜底方案
-const fallbackImageSrc = 'https://wot-design-uni.cn/logoxx.png'
+const fallbackImageSrc =
+  Math.random() > 0.5
+    ? 'https://wot-design-uni.cn/logo.png'
+    : 'https://wot-design-uni.cn/logoxx.png'
 
 let overtime = false
 
