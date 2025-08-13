@@ -109,8 +109,8 @@ const maxWait = 2000
 // 占位图片地址 - 可以修改为失败的地址来测试最终兜底方案
 const fallbackImageSrc =
   Math.random() > 0.5
-    ? 'https://wot-design-uni.cn/logo.png'
-    : 'https://wot-design-uni.cn/logoxx.png'
+    ? 'https://sutras.github.io/sard-uniapp-docs//logo.svg'
+    : 'https://sutras.github.io/sard-uniapp-docs//logoxxxx.svg'
 
 let overtime = false
 

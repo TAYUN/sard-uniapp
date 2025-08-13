@@ -65,6 +65,7 @@ const emit = defineEmits<WaterfallEmits>()
 // BEM 样式类名生成器
 const bem = createBem('waterfall')
 
+//容器是否活跃 TODO 应该要支持受控和非受控模式
 const isActive = ref(true)
 
 // ==================== 容器尺寸管理 ====================
@@ -344,12 +345,10 @@ const processQueue = async () => {
     const item = pendingItems[0] // 取队列第一个项目
     // 检查项目是否已加载
     if (!item.loaded) {
-      // todo 如果没有外面的if，下面这里unwatch会报错
       await new Promise<void>((resolve, reject) => {
         // 创建一个监听器
         const stop = watch(
           () => item.loaded,
-          // todo 这里立即执行是false 怎么办
           (newLoaded) => {
             if (newLoaded) {
               stop() // 停止监听
@@ -428,6 +427,7 @@ const resetItemsForReflow = () => {
 /**
  * 完整重排函数
  * 重置所有状态，重新排版所有项目
+ * 主要用于: 当列数、列间距、行间距发生变化时，需要完整重新排版
  */
 const fullReflow = debounce(async () => {
   // 重置列
@@ -448,6 +448,7 @@ const fullReflow = debounce(async () => {
 
 /**
  * 刷新重排
+ * 主要用于下拉刷新，基础容器参数没变化的情况
  */
 const refreshReflow = async () => {
   // 重置列
@@ -462,6 +463,7 @@ const refreshReflow = async () => {
 /**
  * 增量重排函数
  * 仅处理当前待排版队列中的项目
+ * 主要用于: 页面隐藏，需要增量重排
  */
 const reflow = () => {
   return processQueue()
