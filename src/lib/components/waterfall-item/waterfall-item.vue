@@ -10,13 +10,13 @@
       :column-width="context.columnWidth"
       :key="itemId"
       :error-info="{
-        hasError: showFallback,
-        showFinalFallback: showFinalFallback,
-        errorType,
-        errorMessage,
-        fallbackImageSrc,
-        onFallbackLoad,
-        onFallbackError,
+        hasError: item.showFallback,
+        showFinalFallback: item.showFinalFallback,
+        errorType: item.errorType,
+        errorMessage: item.errorMessage,
+        fallbackImageSrc: fallbackImageSrc,
+        onFallbackLoad: onFallbackLoad,
+        onFallbackError: onFallbackError,
       }"
     ></slot>
   </view>
@@ -32,8 +32,8 @@
  * 3. 根据父组件计算的位置进行定位
  * 4. 提供加载完成回调给内容组件
  * 5. 支持平滑的显示动画效果
- *
  * todo:
+ * 简化item的属性
  * 添加错误处理支持受控和非受控功能
  * 异常高度规范化处理，目前使用的是特殊高度240.0000000000011
  */
@@ -99,22 +99,16 @@ const fallbackImageSrc =
     ? 'https://sutras.github.io/sard-uniapp-docs//logo.svg'
     : 'https://sutras.github.io/sard-uniapp-docs//logoxxxx.svg'
 
-let errorType = 'none' // 三层错误处理状态 错误类型：none | original-failed | fallback-failed | timeout
-let errorMessage = '' // 错误信息
-let showFallback = false // 显示占位图片（第二层）
-let showFinalFallback = false // 显示最终兜底方案（第三层）
-
-//是否超时
 let overtime = false
 
 // 超时处理机制
 const { start: startTimeout } = useTimeout(async () => {
   if (!item.loaded && !overtime) {
-    console.log('加载超时，启用兜底方案')
+    // console.log('加载超时，启用兜底方案')
     overtime = true
-    errorType = 'timeout'
-    errorMessage = '加载超时'
-    showFinalFallback = true
+    item.errorType = 'timeout'
+    item.errorMessage = '加载超时'
+    item.showFinalFallback = true
     await item.beforeReflow()
     context.onItemLoad(item)
   }
@@ -143,8 +137,8 @@ const onLoad = async (event?: any) => {
 
   if (item.loadSuccess) {
     // 第一层成功：原始内容加载成功
-    errorType = 'none'
-    errorMessage = ''
+    item.errorType = 'none'
+    item.errorMessage = ''
     await item.beforeReflow()
   } else if (!item.loadSuccess && retryCount > 0) {
     // 还可以重试
@@ -153,9 +147,9 @@ const onLoad = async (event?: any) => {
   } else {
     // 第一层失败：原始内容加载失败，进入第二层（占位图片）
     // console.log('原始内容加载失败，显示占位图片')
-    errorType = 'original-failed'
-    errorMessage = '原始内容加载失败'
-    showFallback = true
+    item.errorType = 'original-failed'
+    item.errorMessage = '原始内容加载失败'
+    item.showFallback = true
   }
 
   if (item.loaded) {
@@ -185,10 +179,10 @@ const onFallbackError = async () => {
   // console.log('占位图片也加载失败，显示最终兜底方案')
   if (overtime) return // 已超时，忽略后续加载事件
 
-  errorType = 'fallback-failed'
-  errorMessage = '占位图片也加载失败'
-  showFinalFallback = true
-  console.log('showFinalFallback', showFinalFallback)
+  item.errorType = 'fallback-failed'
+  item.errorMessage = '占位图片也加载失败'
+  item.showFinalFallback = true
+  console.log('showFinalFallback', item.showFinalFallback)
   // 最后显示最终兜底方案结束处理
   await item.beforeReflow()
   context.onItemLoad(item) // 传递项目信息给父组件
@@ -212,7 +206,11 @@ const item = shallowReactive<WaterfallItemInfo>({
   top: 0, // 垂直位置（由父组件计算）
   left: 0, // 水平位置（由父组件计算）
   index: props.index,
-
+  // 三层错误处理状态
+  errorType: 'none', // 错误类型：none | original-failed | fallback-failed | timeout
+  errorMessage: '', // 错误信息
+  showFallback: false, // 显示占位图片（第二层）
+  showFinalFallback: false, // 显示最终兜底方案（第三层）
   beforeReflow: async () => {
     // 重排前的预处理：更新高度信息
     await updateHeight()
@@ -221,10 +219,10 @@ const item = shallowReactive<WaterfallItemInfo>({
     // 重新加载图片，重置所有错误状态
     item.loaded = false
     item.loadSuccess = false
-    errorType = 'none'
-    errorMessage = ''
-    showFallback = false
-    showFinalFallback = false
+    item.errorType = 'none'
+    item.errorMessage = ''
+    item.showFallback = false
+    item.showFinalFallback = false
     itemId.value = uniqid()
     // 重新启动超时计时器 todo 这里应该打开吗？需要使用参数控制是否重新启动定时器吗？
     if (isReset) {
