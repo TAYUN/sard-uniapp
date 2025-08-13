@@ -37,8 +37,6 @@ const demoList: DemoItem[] = [
   { title: '真实', path: '/pages/components/waterfall/demo/TrueCase' },
   { title: '列数', path: '/pages/components/waterfall/demo/Columns' },
   { title: '刷新', path: '/pages/components/waterfall/demo/Dynamic' },
-  { title: '动画', path: '/pages/components/waterfall/demo/ReflowAnimation' },
-  { title: '平滑', path: '/pages/components/waterfall/demo/SmoothReflow' },
   { title: '已知', path: '/pages/components/waterfall/demo/KnownSize' },
   { title: '等待', path: '/pages/components/waterfall/demo/MaxWait' },
   { title: '大图', path: '/pages/components/waterfall/demo/BigImage' },
@@ -47,14 +45,6 @@ const demoList: DemoItem[] = [
   {
     title: '删除',
     path: '/pages/components/waterfall/demo/WaterfallDeleteDemo',
-  },
-  {
-    title: '真实失败',
-    path: '/pages/components/waterfall/demo/WaterfallRealFailureDemo',
-  },
-  {
-    title: '占位失败',
-    path: '/pages/components/waterfall/demo/WaterfallFallbackFailDemo',
   },
 ]
 

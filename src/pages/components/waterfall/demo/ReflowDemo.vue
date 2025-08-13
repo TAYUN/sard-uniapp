@@ -1,7 +1,7 @@
 <template>
   <view class="reflow-demo">
     <view class="demo-header">
-      <text class="demo-title">无 DOM 二次测量瀑布流重排演示</text>
+      <text class="demo-title">测试公式-参数无变化</text>
       <view class="demo-controls">
         <view class="control-group">
           <text>列数: {{ columns }}</text>
@@ -105,11 +105,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick, getCurrentInstance } from 'vue'
 import {
   useWaterfallReflow,
   type WaterfallItem,
 } from '../utils/use-waterfall-reflow'
+import { getBoundingClientRect } from 'sard-uniapp'
 
 // 响应式数据
 const containerRef = ref()
@@ -119,6 +120,7 @@ const columnGap = ref(10)
 const rowGap = ref(10)
 const reflowTime = ref(0)
 const loadingItems = ref(new Set<string | number>()) // 正在加载的项目ID
+const instance = getCurrentInstance()
 
 // 初始数据
 const items = ref<WaterfallItem[]>([])
@@ -318,11 +320,11 @@ const resetItems = async () => {
 }
 
 // 获取容器宽度
-const updateContainerWidth = () => {
+const updateContainerWidth = async () => {
   if (containerRef.value) {
-    // 在实际项目中，这里应该通过 uni.createSelectorQuery() 获取真实宽度
-    // 这里为了演示简化处理
-    containerWidth.value = 375
+    containerWidth.value = (
+      await getBoundingClientRect(`.waterfall-container`, instance)
+    ).width
   }
 }
 

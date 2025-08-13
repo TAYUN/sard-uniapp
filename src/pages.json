@@ -468,12 +468,6 @@
           "path": "waterfall/index"
         },
         {
-          "path": "waterfall/demo/ReflowAnimation"
-        },
-        {
-          "path": "waterfall/demo/SmoothReflow"
-        },
-        {
           "path": "waterfall/demo/ReflowDemo"
         },
         {
@@ -481,12 +475,6 @@
         },
         {
           "path": "waterfall/demo/WaterfallDeleteDemo"
-        },
-        {
-          "path": "waterfall/demo/WaterfallRealFailureDemo"
-        },
-        {
-          "path": "waterfall/demo/WaterfallFallbackFailDemo"
         }
       ]
     }
