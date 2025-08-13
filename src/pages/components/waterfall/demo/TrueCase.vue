@@ -25,6 +25,7 @@ import { random, shuffle, toast } from 'sard-uniapp'
 import { nextTick, onMounted, ref } from 'vue'
 import WaterfallDemoNavigation from './WaterfallDemoNavigation.vue'
 import { text } from '../../read-more/demo/data'
+import { onReachBottom } from '@dcloudio/uni-app'
 
 interface ListItem {
   title: string
@@ -59,6 +60,10 @@ onMounted(async () => {
   nextTick(() => {
     toast.loading('加载中')
   })
+  list.value.push(...shuffle(await getData()))
+})
+
+onReachBottom(async () => {
   list.value.push(...shuffle(await getData()))
 })
 </script>
