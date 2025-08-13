@@ -11,9 +11,15 @@ export interface WaterfallLoadProps {
 export interface WaterfallLoadSlots {
   default?(props: { onLoad: (event: any) => void; overtime: boolean }): any
 }
-
+export interface ImageLoadEvent {
+  type: 'load' | 'error'
+  detail: {
+    width: number
+    height: number
+  }
+}
 export interface WaterfallLoadEmits {
-  (e: 'load'): void
+  (e: 'load', event: any): void
 }
 
 export interface WaterfallLoadExpose {}

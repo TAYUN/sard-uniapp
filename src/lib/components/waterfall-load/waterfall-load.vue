@@ -47,8 +47,8 @@ const paddingTop = computed(
 const { start } = useTimeout(
   () => {
     if (!loaded) {
-      overtime.value = true
-      emit('load')
+      // overtime.value = true
+      // emit('load', { width: 0, height: 0, type: 'error' })
     }
   },
   () => props.maxWait || 0,
@@ -61,12 +61,14 @@ const onLoad = ({ detail }: any) => {
       currWidth.value = detail.width
       currHeight.value = detail.height
     }
-    emit('load')
+    emit('load', { detail, type: 'load' })
   }
 }
 
 onMounted(() => {
   start()
+  // 已知宽高，应该触发成功
+  onLoad({ detail: { width: currWidth.value, height: currHeight.value } })
 })
 
 // others
