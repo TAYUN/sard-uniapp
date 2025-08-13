@@ -10,36 +10,19 @@
       :column-width="context.columnWidth"
       :key="itemId"
       :error-info="{
-        hasError: item.showFallback,
-        showFinalFallback: item.showFinalFallback,
-        errorType: item.errorType,
-        errorMessage: item.errorMessage,
-        fallbackImageSrc: fallbackImageSrc,
-        onFallbackLoad: onFallbackLoad,
-        onFallbackError: onFallbackError,
+        hasError: showFallback,
+        showFinalFallback: showFinalFallback,
+        errorType,
+        errorMessage,
+        fallbackImageSrc,
+        onFallbackLoad,
+        onFallbackError,
       }"
     ></slot>
   </view>
 </template>
 
 <script setup lang="ts">
-/**
- *     <!-- 失败后的占位图片 -->
-    <view v-else-if="!item.showFinalFallback" class="fallback-container">
-      <image
-        :src="fallbackImageSrc"
-        mode="aspectFill"
-        class="fallback-image"
-        @load="onFallbackLoad"
-        @error="onFallbackError"
-      />
-    </view>
-
-    <!-- 最终兜底方案：文字提示 -->
-    <view v-else class="final-fallback">
-      <text class="fallback-text">图片加载失败</text>
-    </view>
- */
 /**
  * 瀑布流项目组件 - 单个项目容器
  *
@@ -112,16 +95,22 @@ const fallbackImageSrc =
     ? 'https://sutras.github.io/sard-uniapp-docs//logo.svg'
     : 'https://sutras.github.io/sard-uniapp-docs//logoxxxx.svg'
 
+let errorType = 'none' // 三层错误处理状态 错误类型：none | original-failed | fallback-failed | timeout
+let errorMessage = '' // 错误信息
+let showFallback = false // 显示占位图片（第二层）
+let showFinalFallback = false // 显示最终兜底方案（第三层）
+
+//是否超时
 let overtime = false
 
 // 超时处理机制
 const { start: startTimeout } = useTimeout(async () => {
   if (!item.loaded && !overtime) {
-    // console.log('加载超时，启用兜底方案')
+    console.log('加载超时，启用兜底方案')
     overtime = true
-    item.errorType = 'timeout'
-    item.errorMessage = '加载超时'
-    item.showFinalFallback = true
+    errorType = 'timeout'
+    errorMessage = '加载超时'
+    showFinalFallback = true
     await item.beforeReflow()
     context.onItemLoad(item)
   }
@@ -150,8 +139,8 @@ const onLoad = async (event?: any) => {
 
   if (item.loadSuccess) {
     // 第一层成功：原始内容加载成功
-    item.errorType = 'none'
-    item.errorMessage = ''
+    errorType = 'none'
+    errorMessage = ''
     await item.beforeReflow()
   } else if (!item.loadSuccess && retryCount > 0) {
     // 还可以重试
@@ -160,9 +149,9 @@ const onLoad = async (event?: any) => {
   } else {
     // 第一层失败：原始内容加载失败，进入第二层（占位图片）
     // console.log('原始内容加载失败，显示占位图片')
-    item.errorType = 'original-failed'
-    item.errorMessage = '原始内容加载失败'
-    item.showFallback = true
+    errorType = 'original-failed'
+    errorMessage = '原始内容加载失败'
+    showFallback = true
   }
 
   if (item.loaded) {
@@ -192,10 +181,10 @@ const onFallbackError = async () => {
   // console.log('占位图片也加载失败，显示最终兜底方案')
   if (overtime) return // 已超时，忽略后续加载事件
 
-  item.errorType = 'fallback-failed'
-  item.errorMessage = '占位图片也加载失败'
-  item.showFinalFallback = true
-  console.log('showFinalFallback', item.showFinalFallback)
+  errorType = 'fallback-failed'
+  errorMessage = '占位图片也加载失败'
+  showFinalFallback = true
+  console.log('showFinalFallback', showFinalFallback)
   // 最后显示最终兜底方案结束处理
   await item.beforeReflow()
   context.onItemLoad(item) // 传递项目信息给父组件
@@ -219,11 +208,7 @@ const item = shallowReactive<WaterfallItemInfo>({
   top: 0, // 垂直位置（由父组件计算）
   left: 0, // 水平位置（由父组件计算）
   index: props.index,
-  // 三层错误处理状态
-  errorType: 'none', // 错误类型：none | original-failed | fallback-failed | timeout
-  errorMessage: '', // 错误信息
-  showFallback: false, // 显示占位图片（第二层）
-  showFinalFallback: false, // 显示最终兜底方案（第三层）
+
   beforeReflow: async () => {
     // 重排前的预处理：更新高度信息
     await updateHeight()
@@ -232,10 +217,10 @@ const item = shallowReactive<WaterfallItemInfo>({
     // 重新加载图片，重置所有错误状态
     item.loaded = false
     item.loadSuccess = false
-    item.errorType = 'none'
-    item.errorMessage = ''
-    item.showFallback = false
-    item.showFinalFallback = false
+    errorType = 'none'
+    errorMessage = ''
+    showFallback = false
+    showFinalFallback = false
     itemId.value = uniqid()
     // 重新启动超时计时器 todo 这里应该打开吗？需要使用参数控制是否重新启动定时器吗？
     if (isReset) {
@@ -372,36 +357,5 @@ defineExpose<WaterfallItemExpose>({})
   // inset: 0;
   z-index: 9999;
   color: red;
-}
-
-.fallback-container {
-  width: 100%;
-  height: 150px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #f5f5f5;
-}
-
-.fallback-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.final-fallback {
-  width: 100%;
-  height: 150px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #f5f5f5;
-  border: 1px dashed #ddd;
-}
-
-.fallback-text {
-  font-size: 14px;
-  color: #999;
-  text-align: center;
 }
 </style>

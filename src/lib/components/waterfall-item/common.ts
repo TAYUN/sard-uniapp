@@ -55,9 +55,4 @@ export interface WaterfallItemInfo {
   retryCount?: number // 重试次数
   beforeReflow: () => Promise<void> // 重排前的预处理
   refreshImage: (a?: boolean) => Promise<void> // 重排前的预处理
-  // 三层错误处理状态
-  errorType: 'none' | 'original-failed' | 'fallback-failed' | 'timeout' // 错误类型
-  errorMessage: string // 错误信息
-  showFallback: boolean // 显示占位图片（第二层）
-  showFinalFallback: boolean // 显示最终兜底方案（第三层）
 }
