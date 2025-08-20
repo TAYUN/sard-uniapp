@@ -91,7 +91,7 @@ const bem = createBem('waterfall-item')
 let retryCount = 2
 
 // 最大等待时间（包括错误重试和占位图片加载失败的时间）也就是这个item要在maxWait毫秒内处理完成所有情况，否则跳过
-const maxWait = 2000
+const maxWait = 10000000
 
 // 占位图片地址 - 可以修改为失败的地址来测试最终兜底方案
 const fallbackImageSrc =
@@ -129,31 +129,32 @@ let itemId = ref(uniqid())
  * 通知父组件进行重新布局
  */
 const onLoad = async (event?: any) => {
+  context.onItemLoad(item) // 传递项目信息给父组件
   if (overtime) return // 已超时，忽略后续加载事件
   retryCount--
-
   // 检查是否加载成功
   item.loadSuccess = event?.type === 'load'
-
   if (item.loadSuccess) {
     // 第一层成功：原始内容加载成功
     item.errorType = 'none'
     item.errorMessage = ''
     await item.beforeReflow()
+    if (item.height && item.height !== 240.0000000000011) {
+      item.loaded = true
+    }
   } else if (!item.loadSuccess && retryCount > 0) {
+    console.log('重试')
     // 还可以重试
-    // console.log('重试', retryCount)
     await item.refreshImage(false)
+    // item.loaded = true
   } else {
     // 第一层失败：原始内容加载失败，进入第二层（占位图片）
     // console.log('原始内容加载失败，显示占位图片')
     item.errorType = 'original-failed'
     item.errorMessage = '原始内容加载失败'
     item.showFallback = true
-  }
-
-  if (item.loaded) {
-    context.onItemLoad(item) // 传递项目信息给父组件
+    item.height = 100
+    // item.loaded = true
   }
 }
 
@@ -167,6 +168,7 @@ const onFallbackLoad = async () => {
 
   if (overtime) return // 已超时，忽略后续加载事件
   await item.beforeReflow()
+  item.loaded = true
   if (item.loaded) {
     context.onItemLoad(item) // 传递项目信息给父组件
   }
@@ -182,9 +184,10 @@ const onFallbackError = async () => {
   item.errorType = 'fallback-failed'
   item.errorMessage = '占位图片也加载失败'
   item.showFinalFallback = true
-  console.log('showFinalFallback', item.showFinalFallback)
   // 最后显示最终兜底方案结束处理
   await item.beforeReflow()
+  item.loaded = true
+
   context.onItemLoad(item) // 传递项目信息给父组件
 }
 
@@ -211,9 +214,9 @@ const item = shallowReactive<WaterfallItemInfo>({
   errorMessage: '', // 错误信息
   showFallback: false, // 显示占位图片（第二层）
   showFinalFallback: false, // 显示最终兜底方案（第三层）
-  beforeReflow: async () => {
+  beforeReflow: async (flag = false) => {
     // 重排前的预处理：更新高度信息
-    await updateHeight()
+    await updateHeight(flag)
   },
   refreshImage: async (isReset = true) => {
     // 重新加载图片，重置所有错误状态
@@ -237,7 +240,7 @@ const item = shallowReactive<WaterfallItemInfo>({
  * 通过 DOM 查询获取项目的实际渲染高度
  */
 
-const updateHeight = async () => {
+const updateHeight = async (flag = false) => {
   try {
     await nextTick() // 很重要不然会导致获取高度错误
     // await new Promise((resolve) => setTimeout(resolve, 100))
@@ -245,18 +248,21 @@ const updateHeight = async () => {
     const rect = await getBoundingClientRect(`.${itemId.value}`, instance)
     if (!rect?.height || rect?.height === 0) {
       item.height = 240.0000000000011 // 设置特殊高度与默认240高度区别开，避免误伤正常240的情况
-      item.loaded = true
     } else {
       // 纯图片加载加载失败，图片容器可能也是240
       item.height = rect.height
-      item.loaded = true
       // console.log('rect.height', rect.height)
     }
   } catch (error) {
     // 查询失败时静默处理，避免报错
     console.error(error, `error高度获取失败，${item.height}`)
 
-    void 0
+    // void 0
+  } finally {
+    // 移除已处理的项目
+    if (flag) {
+      item.loaded = true
+    }
   }
 }
 
