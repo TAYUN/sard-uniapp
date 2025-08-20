@@ -303,24 +303,45 @@ const recalculateItemsAfterRemoval = () => {
  */
 const onItemLoad = (item: WaterfallItemInfo) => {
   void item.height
-  // // 如果加载失败且允许重试
-  // if (!item.loadSuccess && props.maxRetries > 0) {
-  //   // 初始化重试计数
-  //   if (item.retryCount === undefined) {
-  //     item.retryCount = 0
-  //   }
-  //   // 如果未超过最大重试次数，自动重试
-  //   if (item.retryCount < props.maxRetries) {
-  //     item.retryCount++
-  //     item.loaded = false // 重置加载状态
-  //     // 延迟重试
-  //     setTimeout(() => {
-  //       // 触发重试逻辑
-  //       // emit('retry', { item, retryCount: item.retryCount })
-  //     }, props.retryDelay)
-  //     return
-  //   }
-  // }
+}
+
+// 任何组件都能 import 的模块
+const liveTasks = new Map<
+  WaterfallItemInfo /* item.id */,
+  {
+    resolve: () => void
+    reject: (err: any) => void
+    stop: () => void
+  }
+>()
+
+const waitItemLoaded = async (item: WaterfallItemInfo) => {
+  if (item.loaded) return
+
+  const key = item
+  if (liveTasks.has(key)) {
+    // 复用旧 Promise
+    return new Promise<void>((resolve, reject) => {
+      const old = liveTasks.get(key)!
+      old.resolve = resolve // 覆盖，防止旧的回调被调用
+      old.reject = reject
+    })
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const stop = watch(
+      () => item.loaded,
+      (v) => {
+        if (v) {
+          stop()
+          liveTasks.delete(key)
+          resolve()
+        }
+      },
+      { immediate: true },
+    )
+    liveTasks.set(key, { resolve, reject, stop })
+  })
 }
 
 // ==================== 瀑布流布局算法 ====================
@@ -329,89 +350,77 @@ const onItemLoad = (item: WaterfallItemInfo) => {
  * 从 pendingItems 队列中取出项目进行排版
  */
 const processQueue = async () => {
-  updateLoadStatus()
-  if (pendingItems.length === 0) return
+  try {
+    updateLoadStatus()
+    if (pendingItems.length === 0) return
 
-  // 用一个局部 Set 收集本轮循环里创建的 watch
-  // 1. 定义一个普通 Set 存放控制柄
-  const liveTasks = new Set<{
-    resolve: () => void
-    reject: () => void
-    stop: () => void
-  }>()
+    // 用一个局部 Set 收集本轮循环里创建的 watch
+    // 1. 定义一个普通 Set 存放控制柄
+    const liveTasks = new Set<{
+      resolve: () => void
+      reject: () => void
+      stop: () => void
+    }>()
 
-  // 处理队列中的项目
-  while (pendingItems.length > 0) {
-    const item = pendingItems[0] // 取队列第一个项目
-    // 检查项目是否已加载
-    if (!item.loaded) {
-      await new Promise<void>((resolve, reject) => {
-        // 创建一个监听器
-        const stop = watch(
-          () => item.loaded,
-          (newLoaded) => {
-            if (newLoaded) {
-              stop() // 停止监听
-              resolve() // 解决 Promise
-            }
-          },
-          { immediate: true },
-        )
-        // 把 resolve / reject / stop 一起存起来
-        const handle = { resolve, reject, stop }
-        liveTasks.add(handle)
-      })
+    // 处理队列中的项目
+    while (pendingItems.length > 0) {
+      const item = pendingItems[0] // 取队列第一个项目
+      // 检查项目是否已加载
+      await waitItemLoaded(item)
+
+      if (item.height === 240.0000000000011) {
+        // 下面这个设置item.loaded = false 可以不要，因为下次onShow子组件的刷新方法，会设置loaded = false
+        // pendingItems.forEach((item) => {
+        //   item.loaded = false
+        // })
+        //
+        // 页面不可见，统一清理 watch 和 拒绝 promise 兜底清理：全部 reject + stop
+        liveTasks.forEach(({ reject, stop }) => {
+          reject()
+          stop()
+        })
+        liveTasks.clear()
+        return
+      }
+      const currentMinColumn = getMinColumn()
+
+      // 计算项目位置
+      item.top = currentMinColumn.height + props.rowGap
+      item.left =
+        (props.columnGap + columnWidth.value) * currentMinColumn.colIndex
+      const targetColumnIndex = currentMinColumn.colIndex
+      const newHeight = item.top + item.height
+      columns[targetColumnIndex].height = newHeight
+
+      // 直接设置可见状态
+      item.visible = true
+
+      // 从队列中移除已排版的项目
+      containerHeight.value = Math.max(...columns.map((col) => col.height), 0)
+      pendingItems.shift()
     }
 
-    if (!isActive.value || item.height === 240.0000000000011) {
-      // 下面这个设置item.loaded = false 可以不要，因为下次onShow子组件的刷新方法，会设置loaded = false
-      // pendingItems.forEach((item) => {
-      //   item.loaded = false
-      // })
-      //
-      // 页面不可见，统一清理 watch 和 拒绝 promise 兜底清理：全部 reject + stop
-      liveTasks.forEach(({ reject, stop }) => {
-        reject()
-        stop()
-      })
-      liveTasks.clear()
-      console.log('页面不活跃，暂停排版 2', pendingItems)
-      return
+    // 计算容器总高度（取最高列的高度）
+
+    // 所有项目处理完成后，清除全局重排状态
+    if (pendingItems.length === 0) {
+      isReflowing.value = false
     }
-    const currentMinColumn = getMinColumn()
 
-    // 计算项目位置
-    item.top = currentMinColumn.height + props.rowGap
-    item.left =
-      (props.columnGap + columnWidth.value) * currentMinColumn.colIndex
-    const targetColumnIndex = currentMinColumn.colIndex
-    const newHeight = item.top + item.height
-    columns[targetColumnIndex].height = newHeight
+    // 全部排完后，兜底清理残余 watch
+    liveTasks.forEach(({ reject, stop }) => {
+      reject()
+      stop()
+    })
+    liveTasks.clear()
 
-    // 直接设置可见状态
-    item.visible = true
-
-    // 从队列中移除已排版的项目
-    containerHeight.value = Math.max(...columns.map((col) => col.height), 0)
-    pendingItems.shift()
+    // 更新加载状态
+    updateLoadStatus()
+  } catch (error) {
+    console.log('error', error)
+    console.log('liveTasks', liveTasks)
+    console.log('pendingItems', pendingItems)
   }
-
-  // 计算容器总高度（取最高列的高度）
-
-  // 所有项目处理完成后，清除全局重排状态
-  if (pendingItems.length === 0) {
-    isReflowing.value = false
-  }
-
-  // 全部排完后，兜底清理残余 watch
-  liveTasks.forEach(({ reject, stop }) => {
-    reject()
-    stop()
-  })
-  liveTasks.clear()
-
-  // 更新加载状态
-  updateLoadStatus()
 }
 
 const resetItemsForReflow = () => {
@@ -421,7 +430,7 @@ const resetItemsForReflow = () => {
   // 重置项目状态
   items.forEach((item) => {
     item.loaded = false
-    item.beforeReflow()
+    item.beforeReflow(true)
   })
 }
 /**
@@ -501,7 +510,17 @@ watch(
         }, 0)
       }) // 延迟执行，确保页面完全激活
     }
-    // 页面变为不活跃时不需要特殊处理，processQueue 会自动停止
+    // 🔥 关键：页面失活时兜底清理
+    if (!newActive && oldActive) {
+      liveTasks.forEach(({ reject, stop }) => {
+        reject(new Error('页面失活，排版中断'))
+        stop()
+      })
+      liveTasks.clear()
+      console.log('liveTasks', liveTasks)
+      console.log('pendingItems', pendingItems)
+      console.log('页面失活，已清理所有待处理 Promise')
+    }
   },
   {
     immediate: false,
