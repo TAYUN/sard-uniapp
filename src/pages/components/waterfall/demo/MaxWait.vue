@@ -4,19 +4,27 @@
       <sar-waterfall-item v-for="(item, index) in list" :key="index">
         <template #default="{ onLoad }">
           <sar-waterfall-load
+            class="relative"
             :width="100"
-            :height="100"
+            :height="120"
             :max-wait="300"
             @load="onLoad"
           >
             <template #default="{ onLoad, overtime }">
               <image
+                v-if="!overtime"
                 mode="aspectFill"
                 class="flex w-full h-full"
                 :src="item.url"
                 @load="onLoad"
                 @error="onLoad"
               />
+              <view
+                v-else
+                class="w-full h-full flex items-center justify-center bg-secondary"
+              >
+                加载超时占位
+              </view>
               <sar-tag
                 v-if="overtime"
                 theme="danger"

@@ -47,28 +47,33 @@ const paddingTop = computed(
 const { start } = useTimeout(
   () => {
     if (!loaded) {
-      // overtime.value = true
-      // emit('load', { width: 0, height: 0, type: 'error' })
+      overtime.value = true
+      // emit('load', { width: 0, height: 0, type: 'error' }) // 这里不必向上汇报
     }
   },
   () => props.maxWait || 0,
 )
 
 const onLoad = ({ detail }: any) => {
-  loaded = true
-  if (!overtime.value) {
-    if (detail.width) {
-      currWidth.value = detail.width
-      currHeight.value = detail.height
-    }
-    emit('load', { detail, type: 'load' })
-  }
+  void detail
+  loaded = true // 图片加载状态
+  // if (!overtime.value) {
+  //   if (detail.width) {
+  //     currWidth.value = detail.width
+  //     currHeight.value = detail.height
+  //   }
+  //   emit('load', { detail, type: 'load' })
+  // }
 }
 
 onMounted(() => {
   start()
   // 已知宽高，应该触发成功
-  onLoad({ detail: { width: currWidth.value, height: currHeight.value } })
+  emit('load', {
+    width: currWidth.value,
+    height: currHeight.value,
+    type: 'load',
+  })
 })
 
 // others
