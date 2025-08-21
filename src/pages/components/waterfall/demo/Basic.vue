@@ -10,7 +10,7 @@
           />
           <!-- 第二层：占位图片 -->
           <view
-            v-else-if="errorInfo.hasError && !errorInfo.showFinalFallback"
+            v-else-if="errorInfo.hasError && !errorInfo.showFallback"
             class="fallback-container"
           >
             <image
