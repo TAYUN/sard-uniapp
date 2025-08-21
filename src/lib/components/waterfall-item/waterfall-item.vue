@@ -92,7 +92,10 @@ defineOptions({
 })
 
 // 组件属性定义
-const props = withDefaults(defineProps<WaterfallItemProps>(), {})
+const props = withDefaults(defineProps<WaterfallItemProps>(), {
+  errorHandlingMode: 'none', // 默认不处理
+  retryCount: 2,
+})
 
 // 插槽定义
 defineSlots<WaterfallItemSlots>()
@@ -109,7 +112,7 @@ const currHeight = ref(props.height || 240)
 const ratio = computed(() => currHeight.value / currWidth.value)
 
 // 图片加载重试次数
-let retryCount = 2
+let retryCount = props.retryCount
 
 // 最大等待时间（包括错误重试和占位图片加载失败的时间）也就是这个item要在maxWait毫秒内处理完成所有情况，否则跳过
 const MAX_WAIT = props?.maxWait || 3000
@@ -123,13 +126,33 @@ const fallbackImageSrc =
 
 let overtime = false
 
-// 超时处理机制
 const { start: startTimeout } = useTimeout(async () => {
   if (!item.loaded && !overtime) {
     console.log('加载超时，启用兜底方案')
     overtime = true
-    item.errorType = 'timeout'
-    item.errorMessage = '加载超时'
+    // 根据模式决定超时后的处理方式
+    switch (props.errorHandlingMode) {
+      case 'none':
+        item.errorType = 'timeout'
+        item.errorMessage = '加载超时'
+        break
+
+      case 'placeholder':
+        item.errorType = 'timeout'
+        item.errorMessage = '加载占位超时'
+        break
+
+      case 'retry':
+        item.errorType = 'timeout'
+        item.errorMessage = '重试超时'
+        break
+
+      case 'fallback':
+        item.errorType = 'timeout'
+        item.errorMessage = '加载超时'
+
+        break
+    }
     item.showFallback = true
     await item.updateHeight()
     item.loaded = true
@@ -154,6 +177,54 @@ const onLoadKnownSize = async () => {
   }
   // todo 如果已知高度也加载失败了呢
 }
+// 模式1：默认模式 - 失败就结束
+const handleLoadFailure_None = async () => {
+  item.errorType = 'fallback-failed'
+  item.errorMessage = '加载失败'
+  await item.updateHeight()
+  item.loaded = true
+  console.log('item', item)
+}
+
+// 模式2：占位图模式 - 失败后直接显示占位图片
+const handleLoadFailure_Placeholder = async () => {
+  item.errorType = 'original-failed'
+  item.errorMessage = '原始内容加载失败，显示占位图片'
+  item.showPlaceholder = true
+  // 不设置 loaded = true，让占位图片的加载回调来处理
+}
+
+// 模式3：只重试模式 - 重试指定次数
+const handleLoadFailure_Retry = async () => {
+  retryCount--
+
+  if (retryCount > 0) {
+    // 还有重试次数，重新加载
+    console.log(`重试加载，剩余次数: ${retryCount}`)
+    await item.refreshImage(false)
+  } else {
+    // 重试次数用完，结束处理
+    item.errorType = 'fallback-failed'
+    item.errorMessage = `重试${props.retryCount}次后仍然失败`
+    await item.updateHeight()
+    item.loaded = true
+  }
+}
+
+// 模式4：完整模式 - 原有的三层处理机制
+const handleLoadFailure_Fallback = async () => {
+  retryCount--
+
+  if (retryCount > 0) {
+    // 重试
+    await item.refreshImage(false)
+  } else {
+    // 进入占位图片阶段
+    item.errorType = 'original-failed'
+    item.errorMessage = '原始内容加载失败'
+    item.showPlaceholder = true
+  }
+}
 /**
  * 第一层：原始内容加载完成回调
  * 当项目内容（如图片）加载完成或失败时调用
@@ -161,30 +232,42 @@ const onLoadKnownSize = async () => {
  */
 const onLoad = async (event?: any) => {
   if (props.width && props.height) return
-  // console.log('event', event)
-  // context.onItemLoad(item) // 传递项目信息给父组件
   if (overtime) return // 已超时，忽略后续加载事件
+
   item.loadSuccess = event?.type === 'load'
-  retryCount--
+
   // 检查是否加载成功
   if (item.loadSuccess) {
-    // 第一层成功：原始内容加载成功
+    // 加载成功：更新高度并完成
     item.errorType = 'none'
     item.errorMessage = ''
     await item.updateHeight()
     if (item.height && !item.heightError) {
       item.loaded = true
-      console.log('item', item)
     }
-  } else if (!item.loadSuccess && retryCount > 0) {
-    // 重试
-    console.log('重试')
-    await item.refreshImage(false)
-  } else {
-    // 第一层失败：原始内容加载失败，进入第二层（占位图片）
-    item.errorType = 'original-failed'
-    item.errorMessage = '原始内容加载失败'
-    item.showPlaceholder = true
+    return
+  }
+
+  // 加载失败：根据模式处理
+  switch (props.errorHandlingMode) {
+    case 'none':
+      // 默认模式：失败就结束，使用默认高度
+      await handleLoadFailure_None()
+      break
+
+    case 'placeholder':
+      await handleLoadFailure_Placeholder()
+      break
+
+    case 'retry':
+      // 重试模式：重试指定次数后结束
+      await handleLoadFailure_Retry()
+      break
+
+    case 'fallback':
+      // 完整模式：重试 + 占位图 + 兜底
+      await handleLoadFailure_Fallback()
+      break
   }
 }
 
@@ -306,8 +389,9 @@ onMounted(async () => {
   if (props.width && props.height) {
     onLoadKnownSize()
   }
+  // 只有在 fallback 模式下才启动超时计时器
   if (props?.maxWait) {
-    startTimeout() // 启动超时计时器
+    startTimeout()
   }
 })
 

@@ -16,9 +16,17 @@ export interface WaterfallItemProps {
    */
   failureMode?: 'placeholder' | 'error-image' | 'retry-tip' | 'hide'
   /**
-   * 失败时的回退高度
+   * 错误处理模式
+   * - 'none': 默认模式，加载一次失败就不再处理，使用默认高度
+   * - 'placeholder': 占位图模式，失败后直接显示占位图片，不重试
+   * - 'retry': 重试模式，失败后重试指定次数，最终失败使用默认高度
+   * - 'fallback': 完整模式，重试 + 占位图 + 最终兜底的三层处理机制
    */
-  fallbackHeight?: number
+  errorHandlingMode?: 'none' | 'placeholder' | 'retry' | 'fallback'
+  /**
+   * 重试次数（仅在 retry 和 fallback 模式下生效）
+   */
+  retryCount?: number
   /**
    * 错误图片地址
    */
