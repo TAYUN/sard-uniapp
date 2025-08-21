@@ -40,13 +40,23 @@ export interface WaterfallItemSlots {
     imageHeight: number
     key: string
     errorInfo: {
-      hasError: boolean
-      showFallback: boolean
-      errorType: 'none' | 'original-failed' | 'fallback-failed' | 'timeout'
-      errorMessage: string
-      fallbackImageSrc: string
-      onFallbackLoad: () => void
-      onFallbackError: () => void
+      status:
+        | 'none'
+        | 'original_failed'
+        | 'placeholder_loading'
+        | 'placeholder_success'
+        | 'timeout'
+        | 'final_fallback'
+      message: string
+      placeholder: {
+        src: string
+        onLoad: () => void
+        onError: () => void
+      }
+      actions: {
+        retry?: () => void
+        refreshImage: () => void
+      }
     }
   }): any
   image?(props: {
@@ -54,13 +64,23 @@ export interface WaterfallItemSlots {
     columnWidth?: number
     key?: string
     errorInfo?: {
-      hasError: boolean
-      showFallback: boolean
-      errorType: 'none' | 'original-failed' | 'fallback-failed' | 'timeout'
-      errorMessage: string
-      fallbackImageSrc: string
-      onFallbackLoad: () => void
-      onFallbackError: () => void
+      status:
+        | 'none'
+        | 'original_failed'
+        | 'placeholder_loading'
+        | 'placeholder_success'
+        | 'timeout'
+        | 'final_fallback'
+      message: string
+      placeholder: {
+        src: string
+        onLoad: () => void
+        onError: () => void
+      }
+      actions: {
+        retry?: () => void
+        refreshImage: () => void
+      }
     }
   }): any
 }
@@ -83,8 +103,5 @@ export interface WaterfallItemInfo {
   updateHeight: (a?: boolean) => Promise<void> // 重排前的预处理
   refreshImage: (a?: boolean) => Promise<void> // 重排前的预处理
   // 三层错误处理状态
-  errorType: 'none' | 'original-failed' | 'fallback-failed' | 'timeout' // 错误类型
-  errorMessage: string // 错误信息
-  showPlaceholder: boolean // 显示占位图片（第二层）
-  showFallback: boolean // 显示最终兜底方案（第三层）
+  // 错误相关字段已移至组件内部的 errorState 管理
 }

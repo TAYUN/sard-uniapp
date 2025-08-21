@@ -4,21 +4,13 @@
     <!-- 向子内容传递加载回调和列宽信息 -->
     <text class="item">{{ item.height.toFixed(2) }}</text>
     <!-- 适用于已知图片高度，如果传入了width,和height，就使用这个 -->
-    <view v-if="$slots.image" :style="waterfallItemImageStyle">
+    <!-- <view v-if="$slots.image" :style="waterfallItemImageStyle">
       <slot
         name="image"
         :on-load="onLoad"
-        :error-info="{
-          hasError: item.showPlaceholder,
-          showFallback: item.showFallback,
-          errorType: item.errorType,
-          errorMessage: item.errorMessage,
-          fallbackImageSrc: fallbackImageSrc,
-          onFallbackLoad: onFallbackLoad,
-          onFallbackError: onFallbackError,
-        }"
+        :error-info="slotErrorInfo"
       ></slot>
-    </view>
+    </view> -->
 
     <!-- 插槽内容，传递完整的错误处理信息 -->
     <slot
@@ -26,15 +18,7 @@
       :column-width="context.columnWidth"
       :image-height="context.columnWidth * ratio"
       :key="itemId"
-      :error-info="{
-        hasError: item.showPlaceholder,
-        showFallback: item.showFallback,
-        errorType: item.errorType,
-        errorMessage: item.errorMessage,
-        fallbackImageSrc: fallbackImageSrc,
-        onFallbackLoad: onFallbackLoad,
-        onFallbackError: onFallbackError,
-      }"
+      :error-info="slotErrorInfo"
     ></slot>
   </view>
 </template>
@@ -133,27 +117,21 @@ const { start: startTimeout } = useTimeout(async () => {
     // 根据模式决定超时后的处理方式
     switch (props.errorHandlingMode) {
       case 'none':
-        item.errorType = 'timeout'
-        item.errorMessage = '加载超时'
+        setStatus(ItemStatus.TIMEOUT, '加载超时')
         break
 
       case 'placeholder':
-        item.errorType = 'timeout'
-        item.errorMessage = '加载占位超时'
+        setStatus(ItemStatus.TIMEOUT, '加载占位超时')
         break
 
       case 'retry':
-        item.errorType = 'timeout'
-        item.errorMessage = '重试超时'
+        setStatus(ItemStatus.TIMEOUT, '重试超时')
         break
 
       case 'fallback':
-        item.errorType = 'timeout'
-        item.errorMessage = '加载超时'
-
+        setStatus(ItemStatus.TIMEOUT, '加载超时')
         break
     }
-    item.showFallback = true
     await item.updateHeight()
     item.loaded = true
   }
@@ -179,8 +157,7 @@ const onLoadKnownSize = async () => {
 }
 // 模式1：默认模式 - 失败就结束
 const handleLoadFailure_None = async () => {
-  item.errorType = 'fallback-failed'
-  item.errorMessage = '加载失败'
+  setStatus(ItemStatus.FINAL_FALLBACK, '加载失败')
   await item.updateHeight()
   item.loaded = true
   console.log('item', item)
@@ -188,9 +165,7 @@ const handleLoadFailure_None = async () => {
 
 // 模式2：占位图模式 - 失败后直接显示占位图片
 const handleLoadFailure_Placeholder = async () => {
-  item.errorType = 'original-failed'
-  item.errorMessage = '原始内容加载失败，显示占位图片'
-  item.showPlaceholder = true
+  setStatus(ItemStatus.ORIGINAL_FAILED, '原始内容加载失败，显示占位图片')
   // 不设置 loaded = true，让占位图片的加载回调来处理
 }
 
@@ -204,8 +179,7 @@ const handleLoadFailure_Retry = async () => {
     await item.refreshImage(false)
   } else {
     // 重试次数用完，结束处理
-    item.errorType = 'fallback-failed'
-    item.errorMessage = `重试${props.retryCount}次后仍然失败`
+    setStatus(ItemStatus.FINAL_FALLBACK, `重试${props.retryCount}次后仍然失败`)
     await item.updateHeight()
     item.loaded = true
   }
@@ -220,9 +194,7 @@ const handleLoadFailure_Fallback = async () => {
     await item.refreshImage(false)
   } else {
     // 进入占位图片阶段
-    item.errorType = 'original-failed'
-    item.errorMessage = '原始内容加载失败'
-    item.showPlaceholder = true
+    setStatus(ItemStatus.ORIGINAL_FAILED, '原始内容加载失败')
   }
 }
 /**
@@ -239,8 +211,7 @@ const onLoad = async (event?: any) => {
   // 检查是否加载成功
   if (item.loadSuccess) {
     // 加载成功：更新高度并完成
-    item.errorType = 'none'
-    item.errorMessage = ''
+    setStatus(ItemStatus.NONE)
     await item.updateHeight()
     if (item.height && !item.heightError) {
       item.loaded = true
@@ -280,6 +251,7 @@ const onFallbackLoad = async () => {
   // errorType 保持为 'original-failed'，因为原始内容确实失败了
 
   if (overtime) return // 已超时，忽略后续加载事件
+  setStatus(ItemStatus.PLACEHOLDER_SUCCESS, '占位图片加载成功')
   await item.updateHeight()
   item.loaded = true
 }
@@ -291,9 +263,7 @@ const onFallbackError = async () => {
   // console.log('占位图片也加载失败，显示最终兜底方案')
   if (overtime) return // 已超时，忽略后续加载事件
 
-  item.errorType = 'fallback-failed'
-  item.errorMessage = '占位图片也加载失败'
-  item.showFallback = true
+  setStatus(ItemStatus.FINAL_FALLBACK, '占位图片也加载失败')
   // 最后显示最终兜底方案结束处理
   await item.updateHeight()
   item.loaded = true
@@ -337,10 +307,7 @@ const refreshImage = async (isReset = true) => {
   // 重新加载图片，重置所有错误状态
   item.loaded = false
   item.loadSuccess = false
-  item.errorType = 'none'
-  item.errorMessage = ''
-  item.showPlaceholder = false
-  item.showFallback = false
+  setStatus(ItemStatus.NONE)
   itemId.value = uniqid()
   // 重新启动超时计时器 todo 这里应该打开吗？需要使用参数控制是否重新启动定时器吗？
   if (isReset && props?.maxWait) {
@@ -353,6 +320,72 @@ const refreshImage = async (isReset = true) => {
 
 // 获取当前组件实例，用于DOM操作
 const instance = getCurrentInstance()
+
+// 错误状态枚举
+const ItemStatus = {
+  NONE: 'none',
+  ORIGINAL_FAILED: 'original_failed',
+  PLACEHOLDER_LOADING: 'placeholder_loading',
+  PLACEHOLDER_SUCCESS: 'placeholder_success',
+  TIMEOUT: 'timeout',
+  FINAL_FALLBACK: 'final_fallback',
+} as const
+
+type ItemStatusType = (typeof ItemStatus)[keyof typeof ItemStatus]
+
+// 单一真相源：错误状态
+const errorState = shallowReactive({
+  status: ItemStatus.NONE as ItemStatusType,
+  message: '',
+})
+// 从 status 派生的布尔值（供内部使用和向下兼容）
+// const showPlaceholder = computed(() => {
+//   return errorState.status === ItemStatus.ORIGINAL_FAILED ||
+//          errorState.status === ItemStatus.PLACEHOLDER_LOADING ||
+//          errorState.status === ItemStatus.PLACEHOLDER_SUCCESS
+// })
+
+// const showFinalFallback = computed(() => {
+//   return errorState.status === ItemStatus.FINAL_FALLBACK
+// })
+
+// const inErrorPhase = computed(() => {
+//   return errorState.status !== ItemStatus.NONE &&
+//          errorState.status !== ItemStatus.PLACEHOLDER_LOADING &&
+//          errorState.status !== ItemStatus.PLACEHOLDER_SUCCESS
+// })
+
+// 设置状态的统一方法
+const setStatus = (status: ItemStatusType, message = '') => {
+  errorState.status = status
+  errorState.message = message
+}
+
+// 语义化的 errorInfo slot 结构
+const slotErrorInfo = computed(() => ({
+  status: errorState.status,
+  message: errorState.message,
+  placeholder: {
+    src: fallbackImageSrc,
+    onLoad: onFallbackLoad,
+    onError: onFallbackError,
+  },
+  actions: {
+    retry: props.errorHandlingMode === 'retry' ? refreshImage : undefined,
+    refreshImage: refreshImage,
+  },
+}))
+
+// 为了向下兼容，映射新的状态模型到原有的 error-info slot 结构
+// const slotErrorInfoLegacy = computed(() => ({
+//   hasError: inErrorPhase.value,
+//   showFallback: showFinalFallback.value,
+//   errorType: errorState.status === ItemStatus.NONE ? 'none' :
+//             errorState.status === ItemStatus.ORIGINAL_FAILED ? 'original-failed' :
+//             errorState.status === ItemStatus.FINAL_FALLBACK ? 'fallback-failed' :
+//             errorState.status === ItemStatus.TIMEOUT ? 'timeout' : 'none',
+//   errorMessage: errorState.message,
+// }))
 
 /**
  * 项目信息对象（响应式）
@@ -369,10 +402,10 @@ const item = shallowReactive<WaterfallItemInfo>({
   left: 0, // 水平位置（由父组件计算）
   index: props.index,
   // 三层错误处理状态
-  errorType: 'none', // 错误类型：none | original-failed | fallback-failed | timeout
-  errorMessage: '', // 错误信息
-  showPlaceholder: false, // 显示占位图片（第二层）
-  showFallback: false, // 显示最终兜底方案（第三层）
+  // errorType: 'none', // 错误类型：none | original-failed | fallback-failed | timeout
+  // errorMessage: '', // 错误信息
+  // showPlaceholder: false, // 显示占位图片（第二层）
+  // showFallback: false, // 显示最终兜底方案（第三层）
   updateHeight,
   refreshImage,
 })
@@ -468,14 +501,14 @@ const waterfallItemStyle = computed(() => {
     props.rootStyle, // 用户自定义样式
   )
 })
-const waterfallItemImageStyle = computed(() => {
-  return stringifyStyle({
-    // 宽度：使用父组件计算的列宽
-    // width: context.columnWidth + 'px',
-    // 高度
-    paddingTop: props?.width && props?.height ? ratio.value * 100 + '%' : '0',
-  })
-})
+// const waterfallItemImageStyle = computed(() => {
+//   return stringifyStyle({
+//     // 宽度：使用父组件计算的列宽
+//     // width: context.columnWidth + 'px',
+//     // 高度
+//     paddingTop: props?.width && props?.height ? ratio.value * 100 + '%' : '0',
+//   })
+// })
 
 // ==================== 组件暴露接口 ====================
 
