@@ -3,11 +3,28 @@
   <view :class="waterfallItemClass" :style="waterfallItemStyle">
     <!-- 向子内容传递加载回调和列宽信息 -->
     <text class="item">{{ item.height.toFixed(2) }}</text>
+    <!-- 适用于已知图片高度，如果传入了width,和height，就使用这个 -->
+    <view v-if="$slots.image" :style="waterfallItemImageStyle">
+      <slot
+        name="image"
+        :on-load="onLoad"
+        :error-info="{
+          hasError: item.showPlaceholder,
+          showFallback: item.showFallback,
+          errorType: item.errorType,
+          errorMessage: item.errorMessage,
+          fallbackImageSrc: fallbackImageSrc,
+          onFallbackLoad: onFallbackLoad,
+          onFallbackError: onFallbackError,
+        }"
+      ></slot>
+    </view>
 
     <!-- 插槽内容，传递完整的错误处理信息 -->
     <slot
       :on-load="onLoad"
       :column-width="context.columnWidth"
+      :image-height="context.columnWidth * ratio"
       :key="itemId"
       :error-info="{
         hasError: item.showPlaceholder,
@@ -86,6 +103,11 @@ defineEmits<WaterfallItemEmits>()
 // BEM 样式类名生成器
 const bem = createBem('waterfall-item')
 
+const currWidth = ref(props.width || 320)
+const currHeight = ref(props.height || 240)
+
+const ratio = computed(() => currHeight.value / currWidth.value)
+
 // 图片加载重试次数
 let retryCount = 2
 
@@ -123,18 +145,28 @@ const { start: startTimeout } = useTimeout(async () => {
 const context = inject(waterfallContextKey)!
 // 生成唯一的项目ID，用于DOM查询
 let itemId = ref(uniqid())
+
+// 如果是已知高度
+const onLoadKnownSize = async () => {
+  await item.updateHeight()
+  if (item.height && !item.heightError) {
+    item.loaded = true
+  }
+  // todo 如果已知高度也加载失败了呢
+}
 /**
  * 第一层：原始内容加载完成回调
  * 当项目内容（如图片）加载完成或失败时调用
  * 通知父组件进行重新布局
  */
 const onLoad = async (event?: any) => {
-  console.log('event', event)
+  if (props.width && props.height) return
+  // console.log('event', event)
   // context.onItemLoad(item) // 传递项目信息给父组件
   if (overtime) return // 已超时，忽略后续加载事件
+  item.loadSuccess = event?.type === 'load'
   retryCount--
   // 检查是否加载成功
-  item.loadSuccess = event?.type === 'load'
   if (item.loadSuccess) {
     // 第一层成功：原始内容加载成功
     item.errorType = 'none'
@@ -267,8 +299,13 @@ const item = shallowReactive<WaterfallItemInfo>({
 /**
  * 组件挂载时：将自己注册到父组件的项目列表中，并启动超时计时器
  */
-onMounted(() => {
+onMounted(async () => {
   context.addItem(item)
+
+  // 判断是否开启固定宽度高度
+  if (props.width && props.height) {
+    onLoadKnownSize()
+  }
   if (props?.maxWait) {
     startTimeout() // 启动超时计时器
   }
@@ -334,7 +371,8 @@ const waterfallItemStyle = computed(() => {
     {
       // 宽度：使用父组件计算的列宽
       width: context.columnWidth + 'px',
-
+      // 高度
+      // paddingTop: props?.width && props?.height ? paddingTop.value : '0',
       // 位置：使用 3D 变换进行定位（性能更好）
       transform: `translate3d(${item.left}px,${item.top}px,0px)`,
 
@@ -345,6 +383,14 @@ const waterfallItemStyle = computed(() => {
     },
     props.rootStyle, // 用户自定义样式
   )
+})
+const waterfallItemImageStyle = computed(() => {
+  return stringifyStyle({
+    // 宽度：使用父组件计算的列宽
+    // width: context.columnWidth + 'px',
+    // 高度
+    paddingTop: props?.width && props?.height ? ratio.value * 100 + '%' : '0',
+  })
 })
 
 // ==================== 组件暴露接口 ====================

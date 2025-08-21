@@ -5,6 +5,8 @@ export interface WaterfallItemProps {
   rootClass?: string
   index?: number
   maxWait?: number
+  width?: number
+  height?: number
   /**
    * 失败处理模式
    * - 'placeholder': 显示占位符（默认）
@@ -27,8 +29,23 @@ export interface WaterfallItemSlots {
   default?(props: {
     onLoad: () => void
     columnWidth: number
+    imageHeight: number
     key: string
     errorInfo: {
+      hasError: boolean
+      showFallback: boolean
+      errorType: 'none' | 'original-failed' | 'fallback-failed' | 'timeout'
+      errorMessage: string
+      fallbackImageSrc: string
+      onFallbackLoad: () => void
+      onFallbackError: () => void
+    }
+  }): any
+  image?(props: {
+    onLoad: () => void
+    columnWidth?: number
+    key?: string
+    errorInfo?: {
       hasError: boolean
       showFallback: boolean
       errorType: 'none' | 'original-failed' | 'fallback-failed' | 'timeout'
