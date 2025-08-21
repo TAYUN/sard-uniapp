@@ -10,8 +10,8 @@
       :column-width="context.columnWidth"
       :key="itemId"
       :error-info="{
-        hasError: item.showFallback,
-        showFinalFallback: item.showFinalFallback,
+        hasError: item.showPlaceholder,
+        showFallback: item.showFallback,
         errorType: item.errorType,
         errorMessage: item.errorMessage,
         fallbackImageSrc: fallbackImageSrc,
@@ -35,7 +35,6 @@
  * todo:
  * 简化item的属性
  * 添加错误处理支持受控和非受控功能
- * 异常高度规范化处理，目前使用的是特殊高度240.0000000000011
  */
 
 import {
@@ -91,7 +90,8 @@ const bem = createBem('waterfall-item')
 let retryCount = 2
 
 // 最大等待时间（包括错误重试和占位图片加载失败的时间）也就是这个item要在maxWait毫秒内处理完成所有情况，否则跳过
-const maxWait = 10000000
+const MAX_WAIT = props?.maxWait || 3000
+const FALLBACK_HEIGHT = 200 // 异常默认高度
 
 // 占位图片地址 - 可以修改为失败的地址来测试最终兜底方案
 const fallbackImageSrc =
@@ -104,15 +104,15 @@ let overtime = false
 // 超时处理机制
 const { start: startTimeout } = useTimeout(async () => {
   if (!item.loaded && !overtime) {
-    // console.log('加载超时，启用兜底方案')
+    console.log('加载超时，启用兜底方案')
     overtime = true
     item.errorType = 'timeout'
     item.errorMessage = '加载超时'
-    item.showFinalFallback = true
-    await item.beforeReflow()
-    context.onItemLoad(item)
+    item.showFallback = true
+    await item.updateHeight()
+    item.loaded = true
   }
-}, maxWait)
+}, MAX_WAIT)
 
 // ==================== 上下文通信 ====================
 
@@ -129,7 +129,8 @@ let itemId = ref(uniqid())
  * 通知父组件进行重新布局
  */
 const onLoad = async (event?: any) => {
-  context.onItemLoad(item) // 传递项目信息给父组件
+  console.log('event', event)
+  // context.onItemLoad(item) // 传递项目信息给父组件
   if (overtime) return // 已超时，忽略后续加载事件
   retryCount--
   // 检查是否加载成功
@@ -138,23 +139,20 @@ const onLoad = async (event?: any) => {
     // 第一层成功：原始内容加载成功
     item.errorType = 'none'
     item.errorMessage = ''
-    await item.beforeReflow()
-    if (item.height && item.height !== 240.0000000000011) {
+    await item.updateHeight()
+    if (item.height && !item.heightError) {
       item.loaded = true
+      console.log('item', item)
     }
   } else if (!item.loadSuccess && retryCount > 0) {
+    // 重试
     console.log('重试')
-    // 还可以重试
     await item.refreshImage(false)
-    // item.loaded = true
   } else {
     // 第一层失败：原始内容加载失败，进入第二层（占位图片）
-    // console.log('原始内容加载失败，显示占位图片')
     item.errorType = 'original-failed'
     item.errorMessage = '原始内容加载失败'
-    item.showFallback = true
-    item.height = 100
-    // item.loaded = true
+    item.showPlaceholder = true
   }
 }
 
@@ -167,11 +165,8 @@ const onFallbackLoad = async () => {
   // errorType 保持为 'original-failed'，因为原始内容确实失败了
 
   if (overtime) return // 已超时，忽略后续加载事件
-  await item.beforeReflow()
+  await item.updateHeight()
   item.loaded = true
-  if (item.loaded) {
-    context.onItemLoad(item) // 传递项目信息给父组件
-  }
 }
 
 /**
@@ -183,57 +178,11 @@ const onFallbackError = async () => {
 
   item.errorType = 'fallback-failed'
   item.errorMessage = '占位图片也加载失败'
-  item.showFinalFallback = true
+  item.showFallback = true
   // 最后显示最终兜底方案结束处理
-  await item.beforeReflow()
+  await item.updateHeight()
   item.loaded = true
-
-  context.onItemLoad(item) // 传递项目信息给父组件
 }
-
-// ==================== 项目信息管理 ====================
-
-// 获取当前组件实例，用于DOM操作
-const instance = getCurrentInstance()
-
-/**
- * 项目信息对象（响应式）
- * 包含项目的所有状态信息，会被父组件用于布局计算
- */
-const item = shallowReactive<WaterfallItemInfo>({
-  loaded: false, // 是否加载完成（图片等资源）
-  loadSuccess: false, // 是否加载成功
-  visible: false, // 是否可见（由父组件控制）
-  width: context.columnWidth, // 项目宽度（DOM 实际宽度）实际上和context.columnWidth相等
-  height: 0, // 项目高度（DOM 实际高度）
-  top: 0, // 垂直位置（由父组件计算）
-  left: 0, // 水平位置（由父组件计算）
-  index: props.index,
-  // 三层错误处理状态
-  errorType: 'none', // 错误类型：none | original-failed | fallback-failed | timeout
-  errorMessage: '', // 错误信息
-  showFallback: false, // 显示占位图片（第二层）
-  showFinalFallback: false, // 显示最终兜底方案（第三层）
-  beforeReflow: async (flag = false) => {
-    // 重排前的预处理：更新高度信息
-    await updateHeight(flag)
-  },
-  refreshImage: async (isReset = true) => {
-    // 重新加载图片，重置所有错误状态
-    item.loaded = false
-    item.loadSuccess = false
-    item.errorType = 'none'
-    item.errorMessage = ''
-    item.showFallback = false
-    item.showFinalFallback = false
-    itemId.value = uniqid()
-    // 重新启动超时计时器 todo 这里应该打开吗？需要使用参数控制是否重新启动定时器吗？
-    if (isReset) {
-      overtime = false
-      startTimeout()
-    }
-  },
-})
 
 /**
  * 更新项目高度
@@ -243,11 +192,11 @@ const item = shallowReactive<WaterfallItemInfo>({
 const updateHeight = async (flag = false) => {
   try {
     await nextTick() // 很重要不然会导致获取高度错误
-    // await new Promise((resolve) => setTimeout(resolve, 100))
     // 查询 DOM 元素的边界信息，获取实际高度
     const rect = await getBoundingClientRect(`.${itemId.value}`, instance)
     if (!rect?.height || rect?.height === 0) {
-      item.height = 240.0000000000011 // 设置特殊高度与默认240高度区别开，避免误伤正常240的情况
+      item.height = FALLBACK_HEIGHT // 出错了，使用默认高度
+      item.heightError = true // 设置特殊高度与默认240高度区别开，避免误伤正常240的情况
     } else {
       // 纯图片加载加载失败，图片容器可能也是240
       item.height = rect.height
@@ -265,6 +214,53 @@ const updateHeight = async (flag = false) => {
     }
   }
 }
+/**
+ * 重新加载图片
+ * @param isReset 是否重置所有错误状态
+ */
+const refreshImage = async (isReset = true) => {
+  // 重新加载图片，重置所有错误状态
+  item.loaded = false
+  item.loadSuccess = false
+  item.errorType = 'none'
+  item.errorMessage = ''
+  item.showPlaceholder = false
+  item.showFallback = false
+  itemId.value = uniqid()
+  // 重新启动超时计时器 todo 这里应该打开吗？需要使用参数控制是否重新启动定时器吗？
+  if (isReset && props?.maxWait) {
+    overtime = false
+    startTimeout()
+  }
+}
+
+// ==================== 项目信息管理 ====================
+
+// 获取当前组件实例，用于DOM操作
+const instance = getCurrentInstance()
+
+/**
+ * 项目信息对象（响应式）
+ * 包含项目的所有状态信息，会被父组件用于布局计算
+ */
+const item = shallowReactive<WaterfallItemInfo>({
+  loaded: false, // 是否加载完成（图片等资源）
+  loadSuccess: false, // 是否加载成功
+  visible: false, // 是否可见（由父组件控制）
+  width: context.columnWidth, // 项目宽度（DOM 实际宽度）实际上和context.columnWidth相等
+  heightError: false, // 是否高度异常
+  height: 0, // 项目高度（DOM 实际高度）
+  top: 0, // 垂直位置（由父组件计算）
+  left: 0, // 水平位置（由父组件计算）
+  index: props.index,
+  // 三层错误处理状态
+  errorType: 'none', // 错误类型：none | original-failed | fallback-failed | timeout
+  errorMessage: '', // 错误信息
+  showPlaceholder: false, // 显示占位图片（第二层）
+  showFallback: false, // 显示最终兜底方案（第三层）
+  updateHeight,
+  refreshImage,
+})
 
 // ==================== 生命周期管理 ====================
 
@@ -273,7 +269,9 @@ const updateHeight = async (flag = false) => {
  */
 onMounted(() => {
   context.addItem(item)
-  startTimeout() // 启动超时计时器
+  if (props?.maxWait) {
+    startTimeout() // 启动超时计时器
+  }
 })
 
 /**
@@ -295,7 +293,7 @@ watch(
   () => item.visible,
   () => {
     if (item.visible) {
-      start() // 自动处理清理和重新设置
+      start()
     } else {
       laterVisible.value = false
     }

@@ -368,7 +368,7 @@ const processQueue = async () => {
       // 检查项目是否已加载
       await waitItemLoaded(item)
 
-      if (item.height === 240.0000000000011) {
+      if (item.heightError) {
         // 下面这个设置item.loaded = false 可以不要，因为下次onShow子组件的刷新方法，会设置loaded = false
         // pendingItems.forEach((item) => {
         //   item.loaded = false
@@ -430,7 +430,7 @@ const resetItemsForReflow = () => {
   // 重置项目状态
   items.forEach((item) => {
     item.loaded = false
-    item.beforeReflow(true)
+    item.updateHeight(true)
   })
 }
 /**
