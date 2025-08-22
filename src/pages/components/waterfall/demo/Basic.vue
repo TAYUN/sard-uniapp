@@ -1,33 +1,45 @@
 <template>
   <doc-page title="基础使用">
     <sar-waterfall class="mx-32" @load="onLoad">
-      <sar-waterfall-item v-for="(item, index) in list" :key="index">
+      <sar-waterfall-item
+        v-for="(item, index) in list"
+        :key="index"
+        error-handling-mode="fallback"
+      >
         <template #default="{ onLoad, errorInfo }">
+          <!-- 第一层：正常内容 -->
           <SimulatedImage
-            v-if="errorInfo.errorType === 'none'"
+            v-if="errorInfo.status === 'none'"
             :meta="item.img"
             @load="onLoad"
           />
           <!-- 第二层：占位图片 -->
           <view
-            v-else-if="errorInfo.hasError && !errorInfo.showFallback"
+            v-else-if="
+              [
+                'original_failed',
+                'placeholder_loading',
+                'placeholder_success',
+              ].includes(errorInfo.status)
+            "
             class="fallback-container"
           >
             <image
-              :src="errorInfo.fallbackImageSrc"
+              :src="errorInfo.placeholder.src"
               mode="aspectFill"
               class="fallback-image"
-              @load="errorInfo.onFallbackLoad"
-              @error="errorInfo.onFallbackError"
+              @load="errorInfo.placeholder.onLoad"
+              @error="errorInfo.placeholder.onError"
             />
           </view>
+          <!-- 第三层：最终兜底 -->
           <view v-else class="final-fallback">
             <view class="fallback-content">
               <text class="fallback-text">
-                {{ errorInfo.errorMessage || '图片加载失败' }}
+                {{ errorInfo.message || '图片加载失败' }}
               </text>
               <text class="fallback-type">
-                {{ getErrorTypeText(errorInfo.errorType) }}
+                {{ getErrorTypeText(errorInfo.status) }}
               </text>
             </view>
           </view>
@@ -80,14 +92,16 @@ const getData = () => {
   })
 }
 // 错误类型文本转换
-const getErrorTypeText = (errorType: string) => {
-  switch (errorType) {
-    case 'original-failed':
+const getErrorTypeText = (status: string) => {
+  switch (status) {
+    case 'original_failed':
       return '原始内容加载失败'
-    case 'fallback-failed':
+    case 'final_fallback':
       return '占位图片也加载失败'
     case 'timeout':
       return '加载超时'
+    case 'placeholder_success':
+      return '占位图片加载成功'
     default:
       return ''
   }
