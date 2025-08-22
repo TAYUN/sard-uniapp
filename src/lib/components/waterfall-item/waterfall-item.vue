@@ -103,10 +103,10 @@ const MAX_WAIT = props?.maxWait || 3000
 const FALLBACK_HEIGHT = 200 // 异常默认高度
 
 // 占位图片地址 - 可以修改为失败的地址来测试最终兜底方案
-const fallbackImageSrc =
-  Math.random() > 0.5
-    ? 'https://sutras.github.io/sard-uniapp-docs//logo.svg'
-    : 'https://sutras.github.io/sard-uniapp-docs//logoxxxx.svg'
+// const fallbackImageSrc =
+//   Math.random() > 0.5
+//     ? 'https://sutras.github.io/sard-uniapp-docs//logo.svg'
+//     : 'https://sutras.github.io/sard-uniapp-docs//logoxxxx.svg'
 
 let overtime = false
 
@@ -374,14 +374,10 @@ const slotErrorInfo = computed(() => ({
   status: errorState.status,
   message: errorState.message,
   placeholder: {
-    src: fallbackImageSrc,
     onLoad: onFallbackLoad,
     onError: onFallbackError,
   },
-  actions: {
-    retry: props.errorHandlingMode === 'retry' ? refreshImage : undefined,
-    refreshImage: refreshImage,
-  },
+  // retry: refreshImage,
 }))
 
 // 为了向下兼容，映射新的状态模型到原有的 error-info slot 结构

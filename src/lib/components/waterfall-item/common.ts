@@ -38,7 +38,7 @@ export interface WaterfallItemSlots {
     onLoad: () => void
     columnWidth: number
     imageHeight: number
-    key: string
+    key?: string
     errorInfo: {
       status:
         | 'none'
@@ -49,14 +49,10 @@ export interface WaterfallItemSlots {
         | 'final_fallback'
       message: string
       placeholder: {
-        src: string
         onLoad: () => void
         onError: () => void
       }
-      actions: {
-        retry?: () => void
-        refreshImage: () => void
-      }
+      // retry?: (isReset?: boolean) => Promise<void>
     }
   }): any
   image?(props: {
