@@ -1,9 +1,20 @@
 <template>
   <doc-page title="基础使用">
+    <!-- 数据插入测试按钮 -->
+    <view class="flex">
+      <sar-button size="mini" @click="insertAtBeginning">头部插入</sar-button>
+      <sar-button size="mini" @click="insertAtMiddle">中间插入</sar-button>
+      <sar-button size="mini" @click="insertAtEnd">尾部插入</sar-button>
+      <sar-button size="mini" @click="insertRandom">随机插入</sar-button>
+      <sar-button size="mini" @click="insertBatch">批量插入</sar-button>
+      <sar-button size="mini" @click="clearAll">清空数据</sar-button>
+    </view>
+
     <sar-waterfall class="mx-32" @load="onLoad">
       <sar-waterfall-item
         v-for="(item, index) in list"
-        :key="index"
+        :key="item.id"
+        :index="index"
         error-handling-mode="fallback"
       >
         <template #default="{ onLoad, errorInfo }">
@@ -67,6 +78,7 @@ interface ListItem {
     width: number
     height: number
   }
+  id: number | string
 }
 
 const placeholderSrc =
@@ -75,24 +87,14 @@ const placeholderSrc =
     : 'https://sutras.github.io/sard-uniapp-docs//logoxxxx.svg'
 
 const list = ref<ListItem[]>([])
+// 全局计数器，确保 index 的顺序性
+let globalIndex = 0
 
-const getData = () => {
+const getData = (count = 3) => {
   return new Promise<ListItem[]>((resolve) => {
-    const data = Array(20)
+    const data = Array(count)
       .fill(0)
-      .map((_, index) => {
-        const min = 20
-        const max = 50
-        const startIndex = random(0, text.length - max)
-        const length = random(min, max)
-        return {
-          title: index + '--' + text.slice(startIndex, startIndex + length),
-          img: {
-            width: random(100, 500),
-            height: random(100, 500),
-          },
-        }
-      })
+      .map(() => generateItem(++globalIndex))
     resolve(data)
   })
 }
@@ -114,6 +116,69 @@ const getErrorTypeText = (status: string) => {
 
 const onLoad = () => {
   toast.hide()
+}
+
+// 生成单个数据项
+const generateItem = (index: number) => {
+  const min = 20
+  const max = 50
+  const startIndex = random(0, text.length - max)
+  const length = random(min, max)
+  return {
+    title: `${index}--${text.slice(startIndex, startIndex + length)}`,
+    id: Date.now(),
+    img: {
+      width: random(100, 500),
+      height: random(100, 500),
+    },
+  }
+}
+
+// 头部插入数据
+const insertAtBeginning = () => {
+  const newItem = generateItem(++globalIndex)
+  list.value.unshift(newItem)
+}
+
+// 中间插入数据
+const insertAtMiddle = () => {
+  if (list.value.length === 0) {
+    insertAtBeginning()
+    return
+  }
+  const middleIndex = Math.floor(list.value.length / 2)
+  const newItem = generateItem(++globalIndex)
+  list.value.splice(middleIndex, 0, newItem)
+}
+
+// 尾部插入数据
+const insertAtEnd = () => {
+  const newItem = generateItem(++globalIndex)
+  list.value.push(newItem)
+}
+
+// 随机位置插入数据
+const insertRandom = () => {
+  if (list.value.length === 0) {
+    insertAtBeginning()
+    return
+  }
+  const randomIndex = random(0, list.value.length)
+  const newItem = generateItem(++globalIndex)
+  list.value.splice(randomIndex, 0, newItem)
+}
+
+// 批量插入数据
+const insertBatch = async () => {
+  const batchData = await getData()
+  const insertIndex = random(0, list.value.length)
+  list.value.splice(insertIndex, 0, ...batchData)
+}
+
+// 清空所有数据
+const clearAll = () => {
+  list.value = []
+  globalIndex = 0 // 重置计数器
 }
 
 onMounted(async () => {
