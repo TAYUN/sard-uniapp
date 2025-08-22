@@ -419,9 +419,8 @@ const item = shallowReactive<WaterfallItemInfo>({
 /**
  * 组件挂载时：将自己注册到父组件的项目列表中，并启动超时计时器
  */
+context.addItem(item)
 onMounted(async () => {
-  context.addItem(item)
-
   // 判断是否开启固定宽度高度
   if (props.width && props.height) {
     onLoadKnownSize()
