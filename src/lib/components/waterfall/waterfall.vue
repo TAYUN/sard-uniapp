@@ -226,9 +226,25 @@ const getMinColumn = () => {
  * @param item 项目信息对象
  */
 const addItem = (item: WaterfallItemInfo) => {
+  console.log('添加项目', item.index)
   // 直接加入待排版队列
   pendingItems.push(item)
-  items.push(item)
+
+  // 检查是否为插入项目（而非末尾追加）
+  const isInsertItem = item.index !== undefined && item.index < items.length
+
+  if (isInsertItem) {
+    // 说明是插入的项目，插入到指定位置
+    console.log(`插入项目到位置 ${item.index}，当前items长度: ${items.length}`)
+    // 标记为插入项目
+    // item.isInserted = true
+    items.splice(item.index!, 0, item)
+  } else {
+    // 末尾追加项目
+    // item.isInserted = false
+    items.push(item)
+  }
+
   // 触发首次开始排版 todo 会不会和isactive冲突并发？
   if (loadStatus === 'idle') {
     reflow()
@@ -351,6 +367,78 @@ const waitItemLoaded = async (item: WaterfallItemInfo) => {
 
 // ==================== 瀑布流布局算法 ====================
 /**
+ * 计算插入位置之前的列高度状态
+ * @param insertIndex 插入位置的索引 这个index首次可能需要减去1
+ * @returns 重新计算后的列高度状态
+ */
+// const calculateColumnsHeightBeforeIndex = (insertIndex: number) => {
+//   // 重置列高度
+//   const tempColumns = Array(props.columns)
+//     .fill(0)
+//     .map((_, index) => ({ colIndex: index, height: 0 }))
+
+//   // 获取插入位置之前的所有已排版项目
+//   const itemsBeforeInsert = items
+//     .filter(
+//       (item) =>
+//         item.index !== undefined && item.index < insertIndex && item.visible,
+//     )
+//     .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+//   console.log('itemsBeforeInsert', itemsBeforeInsert)
+//   // 重新计算这些项目的列高度
+//   itemsBeforeInsert.forEach((item) => {
+//     // 找到该项目所在的列
+//     const columnIndex = Math.floor(
+//       item.left / (props.columnGap + columnWidth.value),
+//     )
+//     const itemBottom = item.top + item.height
+//     tempColumns[columnIndex].height = Math.max(
+//       tempColumns[columnIndex].height,
+//       itemBottom,
+//     )
+//   })
+
+//   return tempColumns
+// }
+
+/**
+ * 插入后进行全重排（类似删除后的处理）
+ */
+const fullReflowAfterInsert = () => {
+  // 重置列高度状态
+  initColumns()
+
+  // 按照当前的index顺序排序所有项目
+  const sortedItems = [...items].sort((a, b) => {
+    const aIndex = a.index ?? 0
+    const bIndex = b.index ?? 0
+    return aIndex - bIndex
+  })
+
+  // 重新排版所有项目
+  for (let i = 0; i < sortedItems.length; i++) {
+    const item = sortedItems[i]
+    // 获取当前最短的列
+    const minColumn = getMinColumn()
+
+    // 计算新位置
+    const newTop = minColumn.height + props.rowGap
+    const newLeft = (props.columnGap + columnWidth.value) * minColumn.colIndex
+
+    // 更新项目位置
+    item.top = newTop
+    item.left = newLeft
+
+    // 更新对应列的高度
+    columns[minColumn.colIndex].height = newTop + item.height
+  }
+
+  // 更新容器总高度
+  const newContainerHeight = Math.max(...columns.map((col) => col.height), 0)
+  containerHeight.value = newContainerHeight
+}
+
+/**
  * 处理排版队列
  * 从 pendingItems 队列中取出项目进行排版
  */
@@ -359,14 +447,6 @@ const processQueue = async () => {
     updateLoadStatus()
     if (pendingItems.length === 0) return
 
-    // 用一个局部 Set 收集本轮循环里创建的 watch
-    // 1. 定义一个普通 Set 存放控制柄
-    // const liveTasks = new Set<{
-    //   resolve: () => void
-    //   reject: (err: any) => void
-    //   stop: () => void
-    // }>()
-
     // 处理队列中的项目
     while (pendingItems.length > 0) {
       const item = pendingItems[0] // 取队列第一个项目
@@ -374,11 +454,6 @@ const processQueue = async () => {
       await waitItemLoaded(item)
 
       if (item.heightError) {
-        // 下面这个设置item.loaded = false 可以不要，因为下次onShow子组件的刷新方法，会设置loaded = false
-        // pendingItems.forEach((item) => {
-        //   item.loaded = false
-        // })
-        //
         // 页面不可见，统一清理 watch 和 拒绝 promise 兜底清理：全部 reject + stop
         liveTasks.forEach(({ reject, stop }) => {
           reject(new Error('高度异常，排版中断，错误码1002'))
@@ -387,17 +462,27 @@ const processQueue = async () => {
         liveTasks.clear()
         return
       }
-      const currentMinColumn = getMinColumn()
 
-      // 计算项目位置
-      item.top = currentMinColumn.height + props.rowGap
-      item.left =
-        (props.columnGap + columnWidth.value) * currentMinColumn.colIndex
-      const targetColumnIndex = currentMinColumn.colIndex
-      const newHeight = item.top + item.height
-      columns[targetColumnIndex].height = newHeight
+      // 检查是否为插入项目（而非末尾追加）
+      const isInsertItem = item.index !== undefined && item.index < items.length
+      // 检查是否为插入项目（使用addItem中设置的标记）
+      if (isInsertItem) {
+        // 6. 插入后进行全重排（类似删除后的处理）
+        fullReflowAfterInsert()
+      } else {
+        // 正常追加项目的处理逻辑
+        const currentMinColumn = getMinColumn()
 
-      // 直接设置可见状态
+        // 计算项目位置
+        item.top = currentMinColumn.height + props.rowGap
+        item.left =
+          (props.columnGap + columnWidth.value) * currentMinColumn.colIndex
+        const targetColumnIndex = currentMinColumn.colIndex
+        const newHeight = item.top + item.height
+        columns[targetColumnIndex].height = newHeight
+      }
+
+      // 设置可见状态
       item.visible = true
 
       // 从队列中移除已排版的项目
