@@ -150,8 +150,10 @@ let itemId = ref(uniqid())
 // 如果是已知高度
 const onLoadKnownSize = async () => {
   await item.updateHeight()
-  if (item.height && !item.heightError) {
-    item.loaded = true
+  item.loaded = true
+  // 如果高度有问题，单独处理
+  if (!item.height || item.heightError) {
+    console.warn('项目高度异常，但仍标记为已加载')
   }
   // todo 如果已知高度也加载失败了呢
 }
@@ -213,8 +215,10 @@ const onLoad = async (event?: any) => {
     // 加载成功：更新高度并完成
     setStatus(ItemStatus.NONE)
     await item.updateHeight()
-    if (item.height && !item.heightError) {
-      item.loaded = true
+    item.loaded = true
+    // 如果高度有问题，单独处理
+    if (!item.height || item.heightError) {
+      console.warn('项目高度异常，但仍标记为已加载')
     }
     return
   }
@@ -276,10 +280,13 @@ const onFallbackError = async () => {
 
 const updateHeight = async (flag = false) => {
   try {
+    // 如果父级排版中断，停止获取dom信息
+    if (context.isLayoutInterrupted) return
     await nextTick() // 很重要不然会导致获取高度错误
     // 查询 DOM 元素的边界信息，获取实际高度
     const rect = await getBoundingClientRect(`.${itemId.value}`, instance)
     if (!rect?.height || rect?.height === 0) {
+      // console.log('rect', rect)
       item.height = FALLBACK_HEIGHT // 出错了，使用默认高度
       item.heightError = true // 设置特殊高度与默认240高度区别开，避免误伤正常240的情况
     } else {
@@ -307,6 +314,7 @@ const refreshImage = async (isReset = true) => {
   // 重新加载图片，重置所有错误状态
   item.loaded = false
   item.loadSuccess = false
+  item.heightError = false
   setStatus(ItemStatus.NONE)
   itemId.value = uniqid()
   // 重新启动超时计时器 todo 这里应该打开吗？需要使用参数控制是否重新启动定时器吗？
