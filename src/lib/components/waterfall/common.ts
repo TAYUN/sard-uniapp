@@ -39,6 +39,7 @@ export interface WaterfallContext {
   removeItem: (item: WaterfallItemInfo) => void
   onItemLoad: (item: WaterfallItemInfo) => void
   isReflowing: boolean // 全局重排状态
+  isLayoutInterrupted: boolean // 排版中断状态
 }
 
 export const waterfallContextKey = Symbol(

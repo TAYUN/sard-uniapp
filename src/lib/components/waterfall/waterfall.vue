@@ -117,6 +117,11 @@ let loadStatus: 'idle' | 'busy' = 'idle'
 const isReflowing = ref(false)
 
 /**
+ * 布局中断状态：用于通知子组件停止不必要的dom信息获取
+ */
+const isLayoutInterrupted = ref(false)
+
+/**
  * 加载完成后的回调函数队列
  * 当所有项目加载完成时，会依次执行这些回调
  */
@@ -356,11 +361,11 @@ const processQueue = async () => {
 
     // 用一个局部 Set 收集本轮循环里创建的 watch
     // 1. 定义一个普通 Set 存放控制柄
-    const liveTasks = new Set<{
-      resolve: () => void
-      reject: () => void
-      stop: () => void
-    }>()
+    // const liveTasks = new Set<{
+    //   resolve: () => void
+    //   reject: (err: any) => void
+    //   stop: () => void
+    // }>()
 
     // 处理队列中的项目
     while (pendingItems.length > 0) {
@@ -376,7 +381,7 @@ const processQueue = async () => {
         //
         // 页面不可见，统一清理 watch 和 拒绝 promise 兜底清理：全部 reject + stop
         liveTasks.forEach(({ reject, stop }) => {
-          reject()
+          reject(new Error('高度异常，排版中断，错误码1002'))
           stop()
         })
         liveTasks.clear()
@@ -409,7 +414,7 @@ const processQueue = async () => {
 
     // 全部排完后，兜底清理残余 watch
     liveTasks.forEach(({ reject, stop }) => {
-      reject()
+      reject(false)
       stop()
     })
     liveTasks.clear()
@@ -417,9 +422,10 @@ const processQueue = async () => {
     // 更新加载状态
     updateLoadStatus()
   } catch (error) {
-    console.log('error', error)
+    isLayoutInterrupted.value = true
+    console.error('error', error)
     console.log('liveTasks', liveTasks)
-    console.log('pendingItems', pendingItems)
+    // console.log('pendingItems', pendingItems)
   }
 }
 
@@ -499,6 +505,7 @@ watch(
   (newActive, oldActive) => {
     if (newActive && !oldActive && pendingItems.length > 0) {
       console.log('页面重新激活，继续处理待排版项目', [...pendingItems])
+      isLayoutInterrupted.value = false // 重置中断信号
       // 必须要用 nextTick
       nextTick(() => {
         pendingItems.forEach((item) => {
@@ -513,7 +520,7 @@ watch(
     // 🔥 关键：页面失活时兜底清理
     if (!newActive && oldActive) {
       liveTasks.forEach(({ reject, stop }) => {
-        reject(new Error('页面失活，排版中断'))
+        reject(new Error('页面失活，排版中断，错误码1000'))
         stop()
       })
       liveTasks.clear()
@@ -550,6 +557,7 @@ provide(
     onItemLoad, // 项目加载完成回调
     columnWidth, // 列宽度（响应式）
     isReflowing, // 全局重排状态（响应式）
+    isLayoutInterrupted, // 排版中断状态（响应式）
   }),
 )
 
