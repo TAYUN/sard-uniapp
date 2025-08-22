@@ -25,7 +25,7 @@
             class="fallback-container"
           >
             <image
-              :src="errorInfo.placeholder.src"
+              :src="placeholderSrc"
               mode="aspectFill"
               class="fallback-image"
               @load="errorInfo.placeholder.onLoad"
@@ -68,6 +68,11 @@ interface ListItem {
     height: number
   }
 }
+
+const placeholderSrc =
+  Math.random() > 0.5
+    ? 'https://sutras.github.io/sard-uniapp-docs//logo.svg'
+    : 'https://sutras.github.io/sard-uniapp-docs//logoxxxx.svg'
 
 const list = ref<ListItem[]>([])
 
