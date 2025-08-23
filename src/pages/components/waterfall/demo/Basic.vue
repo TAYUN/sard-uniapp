@@ -9,6 +9,12 @@
       <sar-button size="mini" @click="insertBatch">批量插入</sar-button>
       <sar-button size="mini" @click="clearAll">清空数据</sar-button>
     </view>
+    <view class="flex mt-16">
+      <sar-button size="mini" @click="deleteAtMiddle">中间删除</sar-button>
+      <sar-button size="mini" @click="deleteRandom">随机删除</sar-button>
+      <sar-button size="mini" @click="deleteFirst">删除首项</sar-button>
+      <sar-button size="mini" @click="deleteLast">删除末项</sar-button>
+    </view>
 
     <sar-waterfall class="mx-32" @load="onLoad">
       <sar-waterfall-item
@@ -179,6 +185,40 @@ const insertBatch = async () => {
 const clearAll = () => {
   list.value = []
   globalIndex = 0 // 重置计数器
+}
+
+// 中间删除数据
+const deleteAtMiddle = () => {
+  if (list.value.length === 0) {
+    return
+  }
+  const middleIndex = Math.floor(list.value.length / 2)
+  list.value.splice(middleIndex, 1)
+}
+
+// 随机删除数据
+const deleteRandom = () => {
+  if (list.value.length === 0) {
+    return
+  }
+  const randomIndex = random(0, list.value.length - 1)
+  list.value.splice(randomIndex, 1)
+}
+
+// 删除首项
+const deleteFirst = () => {
+  if (list.value.length === 0) {
+    return
+  }
+  list.value.shift()
+}
+
+// 删除末项
+const deleteLast = () => {
+  if (list.value.length === 0) {
+    return
+  }
+  list.value.pop()
 }
 
 onMounted(async () => {
