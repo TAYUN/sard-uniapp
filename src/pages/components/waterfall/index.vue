@@ -44,6 +44,12 @@
           hover
           @click="navigateTo('Dynamic')"
         />
+        <sar-list-item
+          title="基础示例 (新版本)"
+          arrow
+          hover
+          @click="navigateToNew('waterfall/demo/basic')"
+        />
       </sar-list>
     </doc-demo>
   </doc-page>
@@ -53,6 +59,12 @@
 const navigateTo = (url: string) => {
   uni.navigateTo({
     url: `/pages/components/waterfall/demo/${url}`,
+  })
+}
+
+const navigateToNew = (url: string) => {
+  uni.navigateTo({
+    url: `/pages/components/waterfall/${url}`,
   })
 }
 </script>

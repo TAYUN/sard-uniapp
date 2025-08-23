@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>瀑布流组件演示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            background: white;
+            padding: 40px 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            color: #333;
+            margin-bottom: 12px;
+        }
+        
+        .header p {
+            font-size: 16px;
+            color: #666;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .demo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+        
+        .demo-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .demo-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+        
+        .demo-card h3 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 12px;
+        }
+        
+        .demo-card p {
+            color: #666;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+        
+        .demo-features {
+            list-style: none;
+            margin-bottom: 20px;
+        }
+        
+        .demo-features li {
+            color: #555;
+            margin-bottom: 6px;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .demo-features li:before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #34c759;
+            font-weight: bold;
+        }
+        
+        .demo-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background-color: #007aff;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #0056cc;
+        }
+        
+        .btn-secondary {
+            background-color: #f8f9fa;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #e9ecef;
+        }
+        
+        .installation {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .installation h2 {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 16px;
+        }
+        
+        .code-block {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 12px 0;
+            overflow-x: auto;
+        }
+        
+        .code-block code {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .step {
+            margin-bottom: 24px;
+        }
+        
+        .step h3 {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .step p {
+            color: #666;
+            margin-bottom: 12px;
+        }
+        
+        .waterfall-preview {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .preview-item {
+            background: white;
+            border-radius: 6px;
+            padding: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .preview-item:nth-child(1) { height: 120px; }
+        .preview-item:nth-child(2) { height: 180px; }
+        .preview-item:nth-child(3) { height: 140px; }
+        .preview-item:nth-child(4) { height: 160px; }
+        .preview-item:nth-child(5) { height: 200px; }
+        .preview-item:nth-child(6) { height: 130px; }
+        
+        .preview-item-content {
+            width: 100%;
+            height: 60%;
+            background: linear-gradient(45deg, #007aff, #34c759);
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        
+        .preview-item-text {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+        
+        @media (max-width: 768px) {
+            .demo-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .waterfall-preview {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌊 瀑布流组件</h1>
+            <p>从 sard-uniapp 项目中提取的独立瀑布流组件，支持 Vue 3 和 uni-app。提供完整的瀑布流布局解决方案，包含智能定位、动态加载、错误处理等功能。</p>
+            
+            <div class="waterfall-preview">
+                <div class="preview-item">
+                    <div class="preview-item-content"></div>
+                    <div class="preview-item-text">项目 1</div>
+                </div>
+                <div class="preview-item">
+                    <div class="preview-item-content"></div>
+                    <div class="preview-item-text">项目 2</div>
+                </div>
+                <div class="preview-item">
+                    <div class="preview-item-content"></div>
+                    <div class="preview-item-text">项目 3</div>
+                </div>
+                <div class="preview-item">
+                    <div class="preview-item-content"></div>
+                    <div class="preview-item-text">项目 4</div>
+                </div>
+                <div class="preview-item">
+                    <div class="preview-item-content"></div>
+                    <div class="preview-item-text">项目 5</div>
+                </div>
+                <div class="preview-item">
+                    <div class="preview-item-content"></div>
+                    <div class="preview-item-text">项目 6</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="demo-grid">
+            <div class="demo-card">
+                <h3>📱 基础示例</h3>
+                <p>展示瀑布流组件的基本功能，包括多列布局、动态加载和基础配置。</p>
+                <ul class="demo-features">
+                    <li>多列瀑布流布局</li>
+                    <li>动态列数调整</li>
+                    <li>懒加载和无限滚动</li>
+                    <li>图片加载状态处理</li>
+                </ul>
+                <div class="demo-actions">
+                    <a href="./basic.vue" class="btn btn-primary">查看代码</a>
+                    <button class="btn btn-secondary" onclick="alert('请在 uni-app 项目中运行此组件')">在线预览</button>
+                </div>
+            </div>
+            
+            <div class="demo-card">
+                <h3>⚡ 高级功能</h3>
+                <p>展示瀑布流组件的高级特性，包括错误处理、自定义配置、统计信息等。</p>
+                <ul class="demo-features">
+                    <li>实时配置调整</li>
+                    <li>错误处理和重试机制</li>
+                    <li>加载统计和状态监控</li>
+                    <li>自定义错误模拟</li>
+                </ul>
+                <div class="demo-actions">
+                    <a href="./advanced.vue" class="btn btn-primary">查看代码</a>
+                    <button class="btn btn-secondary" onclick="alert('请在 uni-app 项目中运行此组件')">在线预览</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="installation">
+            <h2>🚀 快速开始</h2>
+            
+            <div class="step">
+                <h3>1. 复制组件文件</h3>
+                <p>将整个 waterfall 目录复制到你的项目中：</p>
+                <div class="code-block">
+                    <code>cp -r waterfall/ your-project/src/components/</code>
+                </div>
+            </div>
+            
+            <div class="step">
+                <h3>2. 引入样式</h3>
+                <p>在你的主样式文件中引入瀑布流样式：</p>
+                <div class="code-block">
+                    <code>@import './waterfall/styles/index.scss';</code>
+                </div>
+            </div>
+            
+            <div class="step">
+                <h3>3. 使用组件</h3>
+                <p>在 Vue 组件中导入并使用：</p>
+                <div class="code-block">
+                    <code>&lt;template&gt;
+  &lt;Waterfall :columns="2" :column-gap="16"&gt;
+    &lt;WaterfallItem v-for="item in items" :key="item.id" :item="item"&gt;
+      &lt;image :src="item.image" /&gt;
+    &lt;/WaterfallItem&gt;
+  &lt;/Waterfall&gt;
+&lt;/template&gt;
+
+&lt;script setup&gt;
+import Waterfall from './waterfall/components/waterfall.vue'
+import WaterfallItem from './waterfall/components/waterfall-item.vue'
+&lt;/script&gt;</code>
+                </div>
+            </div>
+            
+            <div class="step">
+                <h3>4. 配置选项</h3>
+                <p>可以通过配置文件自定义默认参数：</p>
+                <div class="code-block">
+                    <code>import { setWaterfallConfig } from './waterfall/config'
+
+setWaterfallConfig({
+  columns: 3,
+  columnGap: 20,
+  rowGap: 20
+})</code>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

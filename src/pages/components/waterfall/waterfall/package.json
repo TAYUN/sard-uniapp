@@ -1,0 +1,41 @@
+{
+  "name": "waterfall-component",
+  "version": "1.0.0",
+  "description": "独立的瀑布流组件，从sard-uniapp项目中提取",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint . --ext .ts,.vue",
+    "format": "prettier --write ."
+  },
+  "keywords": [
+    "waterfall",
+    "vue",
+    "uniapp",
+    "component",
+    "瀑布流"
+  ],
+  "author": "sard-uniapp",
+  "license": "MIT",
+  "peerDependencies": {
+    "vue": "^3.0.0",
+    "@dcloudio/uni-app": "^3.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0"
+  },
+  "files": [
+    "components",
+    "utils",
+    "styles",
+    "types",
+    "config",
+    "index.ts",
+    "README.md"
+  ]
+}

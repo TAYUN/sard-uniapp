@@ -1,0 +1,11 @@
+.sar-waterfall-load {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.sar-waterfall-load__content {
+  position: absolute;
+  inset: 0;
+}

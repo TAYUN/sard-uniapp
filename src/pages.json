@@ -475,6 +475,9 @@
         },
         {
           "path": "waterfall/demo/WaterfallDeleteDemo"
+        },
+        {
+          "path": "waterfall/waterfall/demo/basic"
         }
       ]
     }

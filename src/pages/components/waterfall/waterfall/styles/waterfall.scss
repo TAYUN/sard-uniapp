@@ -1,0 +1,11 @@
+:root {
+  --sar-waterfall-duration: 0.25s;
+  --sar-waterfall-reflow-duration: 0.15s;
+}
+
+.sar-waterfall {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}

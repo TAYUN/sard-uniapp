@@ -1,0 +1,5 @@
+// 样式基础文件
+@use './configuration' as *;
+@use './functions' as *;
+@use '../mixins/bem' as *;
+@use '../mixins/universal' as *;
