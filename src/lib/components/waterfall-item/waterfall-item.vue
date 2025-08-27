@@ -17,7 +17,7 @@
       :on-load="onLoad"
       :column-width="context.columnWidth"
       :image-height="context.columnWidth * ratio"
-      :key="itemId"
+      :key="slotId"
       :error-info="slotErrorInfo"
     ></slot>
   </view>
@@ -89,7 +89,7 @@ defineEmits<WaterfallItemEmits>()
 
 // BEM 样式类名生成器
 const bem = createBem('waterfall-item')
-
+const itemId = uniqid()
 const currWidth = ref(props.width || 320)
 const currHeight = ref(props.height || 240)
 
@@ -144,8 +144,8 @@ const { start: startTimeout } = useTimeout(async () => {
  * 包含添加/移除项目、加载回调、列宽等信息
  */
 const context = inject(waterfallContextKey)!
-// 生成唯一的项目ID，用于DOM查询
-let itemId = ref(uniqid())
+// 生成slot唯一ID，用于图片加载失败的时候刷新图片容器
+let slotId = ref(uniqid())
 
 // 如果是已知高度
 const onLoadKnownSize = async () => {
@@ -284,7 +284,7 @@ const updateHeight = async (flag = false) => {
     if (context.isLayoutInterrupted) return
     await nextTick() // 很重要不然会导致获取高度错误
     // 查询 DOM 元素的边界信息，获取实际高度
-    const rect = await getBoundingClientRect(`.${itemId.value}`, instance)
+    const rect = await getBoundingClientRect(`.${itemId}`, instance)
     if (!rect?.height || rect?.height === 0) {
       // console.log('rect', rect)
       item.height = FALLBACK_HEIGHT // 出错了，使用默认高度
@@ -316,7 +316,7 @@ const refreshImage = async (isReset = true) => {
   item.loadSuccess = false
   item.heightError = false
   setStatus(ItemStatus.NONE)
-  itemId.value = uniqid()
+  slotId.value = uniqid()
   // 重新启动超时计时器 todo 这里应该打开吗？需要使用参数控制是否重新启动定时器吗？
   if (isReset && props?.maxWait) {
     overtime = false
@@ -468,7 +468,7 @@ const waterfallItemClass = computed(() => {
     bem.b(), // 基础类名：sar-waterfall-item
     bem.m('show', item.visible || context.isReflowing), // 显示状态：重排时也保持可见
     bem.m('reflowing', context.isReflowing), // 重排状态类名
-    itemId.value, // 唯一ID，用于DOM查询
+    itemId, // 唯一ID，用于DOM查询
     props.rootClass, // 用户自定义类名
   )
 })
