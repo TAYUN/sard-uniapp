@@ -17,6 +17,7 @@
       :on-load="onLoad"
       :column-width="context.columnWidth"
       :image-height="context.columnWidth * ratio"
+      :key="itemId"
       :error-info="slotErrorInfo"
     ></slot>
   </view>
